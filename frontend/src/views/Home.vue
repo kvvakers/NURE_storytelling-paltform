@@ -6,8 +6,8 @@
         <h1 class="_h1">Платформа историй</h1>
         <p class="_p">Читайте, публикуйте и делитесь своими историями</p>
         <div class="hero-buttons">
-          <button class="primary">Начать читать</button>
-          <button class="secondary">Опубликовать историю</button>
+          <button class="btn btn-primary">Начать читать</button>
+          <button class="btn btn-secondary">Опубликовать историю</button>
         </div>
       </section>
 
@@ -19,11 +19,13 @@
           :space-between="20"
           :loop="true"
           navigation
-          class="stories-swiper"
+          class="stories-swiper swiper-fade"
         >
           <swiper-slide v-for="story in popularStoriesRef" :key="story.id">
             <div class="story-card">
-              <img :src="story.cover" alt="cover" />
+              <RouterLink :to="{name: 'Story', params: {id: story.id}}">
+                <img :src="story.cover" alt="cover" />
+              </RouterLink>
             </div>
           </swiper-slide>
         </swiper>
@@ -37,11 +39,13 @@
           :space-between="20"
           :loop="true"
           navigation
-          class="stories-swiper"
+          class="stories-swiper swiper-fade"
         >
           <swiper-slide v-for="story in newStories" :key="story.id">
             <div class="story-card">
-              <img :src="story.cover" alt="cover" />
+              <RouterLink :to="{name: 'Story', params: {id: story.id}}">
+                <img :src="story.cover" alt="cover" />
+              </RouterLink>
             </div>
           </swiper-slide>
         </swiper>
@@ -73,7 +77,6 @@ const newStories = ref(
 </script>
 
 <style scoped>
-
 .hero {
   text-align: center;
   padding: 32px 0;
@@ -89,13 +92,7 @@ const newStories = ref(
   margin: 0 10px;
   padding: 10px 18px;
   border-radius: 8px;
-  border: none;
   cursor: pointer;
-}
-
-.primary {
-  background: #4f46e5;
-  color: white;
 }
 
 .secondary {
@@ -132,15 +129,28 @@ const newStories = ref(
 .story-card h3 {
   margin: 5px 0;
 }
-
-.author {
-  font-size: 13px;
-  color: #888;
+.swiper-fade {
+  position: relative;
 }
 
-.description {
-  font-size: 14px;
-  color: #555;
+.swiper-fade::before,
+.swiper-fade::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 120px;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
 }
 
+.swiper-fade::before {
+  left: 0;
+  background: linear-gradient(to right, #fff, transparent);
+}
+
+.swiper-fade::after {
+  right: 0;
+  background: linear-gradient(to left, #fff, transparent);
+}
 </style>

@@ -10,6 +10,7 @@
         <div class="search-bar">
           <input
             v-model="searchQuery"
+            @keyup.enter="search"
             type="text"
             placeholder="Search stories..."
             class="search-input"
@@ -18,8 +19,8 @@
       </div>
 
       <div class="actions">
-        <button class="btn btn-write" @click="handleWrite">Write</button>
-        <button class="btn btn-login" @click="handleLogin">Login</button>
+        <button class="btn btn-primary" @click="handleWrite">Write</button>
+        <button class="btn btn-secondary" @click="handleLogin">Login</button>
         <button class="btn btn-signup" @click="handleSignUp">Sign Up</button>
       </div>
     </div>
@@ -28,8 +29,13 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
+import { useRouter } from "vue-router";
 
 const searchQuery = ref("");
+const router = useRouter();
+const search = () => {
+  router.push({name: "Search", params: {query: searchQuery.value}})
+}
 
 const handleWrite = () => {
   console.log("Write clicked");
@@ -42,6 +48,7 @@ const handleLogin = () => {
 const handleSignUp = () => {
   console.log("Sign Up clicked");
 };
+
 </script>
 
 <style scoped>
@@ -108,34 +115,6 @@ const handleSignUp = () => {
   display: flex;
   gap: 0.5rem;
   flex-shrink: 0;
-}
-
-.btn {
-  padding: 0.6rem 1.2rem;
-  border: none;
-  border-radius: 6px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.btn-write {
-  background-color: #007bff;
-  color: white;
-}
-
-.btn-write:hover {
-  background-color: #0056b3;
-}
-
-.btn-login {
-  background-color: transparent;
-  color: #333;
-  border: 1px solid #ddd;
-}
-
-.btn-login:hover {
-  background-color: #f5f5f5;
 }
 
 .btn-signup {
