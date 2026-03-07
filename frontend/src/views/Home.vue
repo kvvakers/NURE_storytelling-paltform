@@ -1,7 +1,6 @@
 <template>
   <div class="home">
     <div class="_container">
-      <!-- Hero блок -->
       <section class="hero">
         <h1 class="_h1">Платформа историй</h1>
         <p class="_p">Читайте, публикуйте и делитесь своими историями</p>
@@ -11,7 +10,6 @@
         </div>
       </section>
 
-      <!-- Популярные истории -->
       <section class="section">
         <h2 class="_h2">Популярное</h2>
         <swiper
@@ -23,7 +21,7 @@
         >
           <swiper-slide v-for="story in popularStoriesRef" :key="story.id">
             <div class="story-card">
-              <RouterLink :to="{name: 'Story', params: {id: story.id}}">
+              <RouterLink :to="{name: RouteName.STORY, params: {id: story.id}}">
                 <img :src="story.cover" alt="cover" />
               </RouterLink>
             </div>
@@ -31,7 +29,6 @@
         </swiper>
       </section>
 
-      <!-- Новые истории -->
       <section class="section">
         <h2 class="_h2">Новые истории</h2>
         <swiper
@@ -43,7 +40,7 @@
         >
           <swiper-slide v-for="story in newStories" :key="story.id">
             <div class="story-card">
-              <RouterLink :to="{name: 'Story', params: {id: story.id}}">
+              <RouterLink :to="{name: RouteName.STORY, params: {id: story.id}}">
                 <img :src="story.cover" alt="cover" />
               </RouterLink>
             </div>
@@ -63,6 +60,7 @@ import "swiper/css";
 import "swiper/css/navigation";
 import { Navigation } from "swiper/modules";
 import SwiperCore from "swiper";
+import { RouteName } from "../router/keys";
 SwiperCore.use([Navigation]);
 
 const popularStoriesRef = ref(

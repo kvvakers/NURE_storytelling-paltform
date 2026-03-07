@@ -18,7 +18,16 @@
         </div>
       </div>
 
-      <div class="actions">
+      <RouterLink
+        v-if="userStore.isAuthorized"
+        :to="{ name: RouteName.PROFILE, params: { nickname: 'adf' } }"
+        class="profile _flex _ai-c"
+      >
+        <div class="profile-img"></div>
+        <div class="profile-name">name</div>
+      </RouterLink>
+
+      <div v-else class="actions">
         <button class="btn btn-primary" @click="handleWrite">Write</button>
         <button class="btn btn-secondary" @click="handleLogin">Login</button>
         <button class="btn btn-signup" @click="handleSignUp">Sign Up</button>
@@ -30,12 +39,15 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useRouter } from "vue-router";
+import { RouteName } from "../router/keys";
+import { useUserStore } from "../stores/user";
 
+const userStore = useUserStore();
 const searchQuery = ref("");
 const router = useRouter();
 const search = () => {
-  router.push({name: "Search", params: {query: searchQuery.value}})
-}
+  router.push({ name: RouteName.SEARCH, params: { query: searchQuery.value } });
+};
 
 const handleWrite = () => {
   console.log("Write clicked");
@@ -48,7 +60,6 @@ const handleLogin = () => {
 const handleSignUp = () => {
   console.log("Sign Up clicked");
 };
-
 </script>
 
 <style scoped>
@@ -124,5 +135,12 @@ const handleSignUp = () => {
 
 .btn-signup:hover {
   background-color: #218838;
+}
+.profile-img {
+  width: 30px;
+  height: 30px;
+  background-color: #28a745;
+  border-radius: 50%;
+  margin-right: 8px;
 }
 </style>

@@ -19,6 +19,9 @@ a {
 ._flex {
   display: flex;
 }
+._ai-c {
+  align-items: center;
+}
 ._flex-full {
   flex: 1 1 auto;
 }
