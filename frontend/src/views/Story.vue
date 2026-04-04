@@ -12,7 +12,7 @@
           <p><b>Автор:</b> {{ story.author }}</p>
           <p><b>Описание:</b> {{ story.description }}</p>
           <p><b>Рейтинг:</b> {{ story.rating }}/10</p>
-          <p><b>Дата публикации:</b> {{ new Date(story.created_at).toLocaleDateString() }}</p>
+          <p><b>Дата публикации:</b> {{ new Date(story.createdAt).toLocaleDateString() }}</p>
 
           <div class="genres">
             <span v-for="g in story.genres" :key="g" class="genre">
@@ -147,22 +147,21 @@
 </template>
 
 <script setup lang="ts">
+import { computed, ref, onMounted, watch } from "vue";
 import { useRoute } from "vue-router";
-import { data as stories } from "../mock/stories";
-import { computed, ref, onMounted } from "vue";
+
+interface Reply {
+  text: string;
+  author?: string;
+  date: string;
+}
 
 interface Comment {
   selectedText: string;
   text: string;
   author?: string;
-  date: Date;
+  date: string;
   replies?: Reply[];
-}
-
-interface Reply {
-  text: string;
-  author?: string;
-  date: Date;
 }
 
 interface Chapter {
@@ -170,52 +169,73 @@ interface Chapter {
   content: string;
 }
 
+interface Story {
+  id: number;
+  title: string;
+  author: string;
+  description: string;
+  rating: number;
+  createdAt: string;
+  cover: string;
+  genres: string[];
+  chapters: Chapter[];
+}
+
 const route = useRoute();
-
-const story = computed(() => {
-  const id = Number(route.params.id);
-  return stories.find((s) => s.id === id);
-});
-
-// Sample chapters - in production this would come from backend
-const chapters = ref<Chapter[]>([
-  {
-    title: "Глава 1: Начало",
-    content: `<p>Это была холодная ночь декабря, когда всё началось. Луна висела над городом, как бледный шар, освещая улицы тусклым светом. Главный герой шёл по тротуару, глубоко погрузившись в мысли о прошлом.</p>
-    <p>Каждый шаг отзывался в тишине города. Вокруг не было ни единого человека, только редкие машины проезжали время от времени. Он поднял воротник пальто выше, защищаясь от холодова ветра.</p>
-    <p>Сегодня был особенный день. День, который изменит всё. День, который он ждал так долго. Но теперь, когда момент наступил, он чувствовал только страх и неуверенность.</p>`
-  },
-  {
-    title: "Глава 2: Встреча",
-    content: `<p>Впереди, под фонарём, он увидел силуэт. Это была женщина. Она стояла неподвижно, ожидая. Её волосы развевались на ветру, и даже издалека было видно, что она красива.</p>
-    <p>Сердце главного героя заколотилось быстрее. Он остановился, не зная, идти ли дальше. Но ноги сами несли его вперёд, как будто по собственной воле.</p>
-    <p>"Ты пришёл", - сказала она, когда он подошёл ближе. Голос её был мягким, почти шёпотом. "Я ждала тебя так долго..."</p>`
-  }
-]);
-
+const story = ref<Story | null>(null);
+const chapters = ref<Chapter[]>([]);
 const activeChapterIndex = ref(0);
 
-const activeChapter = computed(() => chapters.value[activeChapterIndex.value]);
+const activeChapter = computed(() => {
+  return chapters.value[activeChapterIndex.value] || { title: "", content: "" };
+});
 
 const activeChapterComments = computed(() => {
   return chapterComments.value[activeChapterIndex.value] || [];
 });
 
-// Comments state
-const chapterComments = ref<Comment[][]>(
-  Array(chapters.value.length).fill([])
-);
-
+const chapterComments = ref<Comment[][]>([]);
 const selectedText = ref("");
 const showCommentTooltip = ref(false);
 const showCommentPanel = ref(false);
 const newCommentText = ref("");
 const tooltipPosition = ref({ top: "0px", left: "0px" });
-
 const expandedReplyIndex = ref(-1);
 const replyText = ref("");
-
 const chapterTextRef = ref<HTMLElement | null>(null);
+
+const loadStory = async () => {
+  const id = Number(route.params.id);
+  if (!id) {
+    story.value = null;
+    return;
+  }
+
+  try {
+    const response = await fetch(`http://localhost:3000/stories/${id}`);
+    if (!response.ok) {
+      story.value = null;
+      return;
+    }
+
+    const data = await response.json();
+    story.value = data;
+    chapters.value = data.chapters || [];
+    chapterComments.value = Array(chapters.value.length).fill([]);
+    activeChapterIndex.value = 0;
+  } catch (error) {
+    console.error("Failed to load story:", error);
+    story.value = null;
+  }
+};
+
+onMounted(loadStory);
+watch(
+  () => route.params.id,
+  () => {
+    loadStory();
+  },
+);
 
 const handleTextSelection = () => {
   const selection = window.getSelection();
@@ -223,7 +243,6 @@ const handleTextSelection = () => {
   if (selection && selection.toString().length > 0) {
     selectedText.value = selection.toString();
     
-    // Get position for tooltip
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
     const containerRect = chapterTextRef.value?.getBoundingClientRect();
@@ -262,11 +281,16 @@ const submitComment = () => {
     selectedText: selectedText.value,
     text: newCommentText.value,
     author: "Читатель",
-    date: new Date(),
+    date: new Date().toISOString(),
     replies: []
   };
 
-  chapterComments.value[activeChapterIndex.value].push(newComment);
+  const currentIndex = activeChapterIndex.value;
+  if (!chapterComments.value[currentIndex]) {
+    chapterComments.value[currentIndex] = [];
+  }
+
+  chapterComments.value[currentIndex].push(newComment);
   closeCommentPanel();
   alert("Комментарий успешно добавлен!");
 };
@@ -285,19 +309,29 @@ const submitReply = (commentIndex: number) => {
   const reply: Reply = {
     text: replyText.value,
     author: "Читатель",
-    date: new Date()
+    date: new Date().toISOString()
   };
 
-  if (!chapterComments.value[activeChapterIndex.value][commentIndex].replies) {
-    chapterComments.value[activeChapterIndex.value][commentIndex].replies = [];
+  const currentComments = chapterComments.value[activeChapterIndex.value];
+  if (!currentComments) {
+    return;
   }
 
-  chapterComments.value[activeChapterIndex.value][commentIndex].replies!.push(reply);
+  const comment = currentComments[commentIndex];
+  if (!comment) {
+    return;
+  }
+
+  if (!comment.replies) {
+    comment.replies = [];
+  }
+
+  comment.replies.push(reply);
   toggleReplyForm(-1);
   alert("Ответ успешно добавлен!");
 };
 
-const formatDate = (date: Date) => {
+const formatDate = (date: string | Date) => {
   return new Date(date).toLocaleDateString("ru-RU", {
     year: "numeric",
     month: "short",

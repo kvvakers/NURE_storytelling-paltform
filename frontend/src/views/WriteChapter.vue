@@ -294,14 +294,35 @@ const submitChapter = async () => {
   }
 
   try {
-    console.log("Submitting story with chapter:", {
-      story: storyData.value,
-      chapter: chapterData.value,
-      comments: comments.value,
+    const payload = {
+      title: storyData.value.title,
+      description: storyData.value.description,
+      characters: storyData.value.characters,
+      genres: storyData.value.genres,
+      tags: storyData.value.tags,
+      language: storyData.value.language,
+      cover: storyData.value.cover,
+      chapter: {
+        title: chapterData.value.title,
+        content: chapterData.value.content,
+      },
+    };
+
+    const response = await fetch("http://localhost:3000/stories", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     });
 
+    if (!response.ok) {
+      throw new Error("Failed to publish story");
+    }
+
+    const createdStory = await response.json();
     alert("История и первая глава успешно опубликованы!");
-    router.push({ name: RouteName.HOME });
+    router.push({ name: RouteName.STORY, params: { id: String(createdStory.id) } });
   } catch (error) {
     console.error("Error submitting chapter:", error);
     alert("Ошибка при публикации главы");

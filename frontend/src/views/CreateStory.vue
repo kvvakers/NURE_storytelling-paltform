@@ -160,7 +160,7 @@ const formData = ref({
   genres: [] as string[],
   tags: "",
   language: "",
-  cover: null as File | null
+  cover: ""
 });
 
 const parsedTags = ref<string[]>([]);
@@ -170,10 +170,11 @@ const handleImageUpload = (event: Event) => {
   const file = target.files?.[0];
   
   if (file) {
-    formData.value.cover = file;
     const reader = new FileReader();
     reader.onload = (e) => {
-      previewImage.value = e.target?.result as string;
+      const dataUrl = e.target?.result as string;
+      previewImage.value = dataUrl;
+      formData.value.cover = dataUrl;
     };
     reader.readAsDataURL(file);
   }
@@ -181,7 +182,7 @@ const handleImageUpload = (event: Event) => {
 
 const removeCover = () => {
   previewImage.value = "";
-  formData.value.cover = null;
+  formData.value.cover = "";
 };
 
 const updateTags = () => {
@@ -203,29 +204,27 @@ const removeTag = (tag: string) => {
 const submitStory = async () => {
   updateTags();
   
-  // Validate form
   if (!formData.value.title.trim()) {
     alert("Пожалуйста, введите название");
     return;
   }
-  
+
   if (!formData.value.description.trim()) {
     alert("Пожалуйста, введите описание");
     return;
   }
-  
+
   if (formData.value.genres.length === 0) {
     alert("Пожалуйста, выберите хотя бы один жанр");
     return;
   }
-  
+
   if (!formData.value.language) {
     alert("Пожалуйста, выберите язык");
     return;
   }
 
   try {
-    // Prepare data to pass to WriteChapter
     const storyPayload = {
       title: formData.value.title,
       description: formData.value.description,
@@ -236,7 +235,6 @@ const submitStory = async () => {
       cover: formData.value.cover
     };
 
-    // Navigate to WriteChapter with story data
     router.push({
       name: RouteName.WRITE_CHAPTER,
       params: {

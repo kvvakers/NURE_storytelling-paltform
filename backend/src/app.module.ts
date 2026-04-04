@@ -19,9 +19,9 @@ import { DocumentsModule } from './modules/documents/documents.module';
       username: process.env.POSTGRES_USER,
       password: process.env.POSTGRES_PASSWORD,
       database: process.env.POSTGRES_DB,
-      synchronize: false,
-      entities: [__dirname + '/../models/entities/**/*{.entity.ts,.entity.js}'],
-      migrations: [__dirname + '/../migrations/**/*{.ts,.js}'],
+      synchronize: true,
+      entities: [__dirname + '/models/entities/**/*{.entity.ts,.entity.js}'],
+      migrations: [__dirname + '/migrations/**/*{.ts,.js}'],
     }),
 
     MongooseModule.forRoot(

@@ -14,7 +14,11 @@
 
       <section class="section">
         <h2 class="_h2">Популярное</h2>
+        <div v-if="isLoading" class="loading-state">Загрузка историй...</div>
+        <div v-if="errorMessage" class="error-state">{{ errorMessage }}</div>
+        <div v-if="!isLoading && stories.length === 0" class="loading-state">Пока нет доступных историй.</div>
         <swiper
+          v-if="stories.length > 0"
           :slides-per-view="7"
           :space-between="20"
           :loop="true"
@@ -25,13 +29,18 @@
             <div class="story-card">
               <RouterLink :to="{name: RouteName.STORY, params: {id: story.id}}">
                 <img :src="story.cover" alt="cover" />
+                <div class="story-card-info">
+                  <h3>{{ story.title }}</h3>
+                  <p>{{ story.author || 'Автор не указан' }}</p>
+                  <p>{{ new Date(story.created_at).toLocaleDateString() }}</p>
+                </div>
               </RouterLink>
             </div>
           </swiper-slide>
         </swiper>
       </section>
 
-      <section class="section">
+      <section v-if="stories.length > 0" class="section">
         <h2 class="_h2">Новые истории</h2>
         <swiper
           :slides-per-view="7"
@@ -44,6 +53,11 @@
             <div class="story-card">
               <RouterLink :to="{name: RouteName.STORY, params: {id: story.id}}">
                 <img :src="story.cover" alt="cover" />
+                <div class="story-card-info">
+                  <h3>{{ story.title }}</h3>
+                  <p>{{ story.author || 'Автор не указан' }}</p>
+                  <p>{{ new Date(story.created_at).toLocaleDateString() }}</p>
+                </div>
               </RouterLink>
             </div>
           </swiper-slide>
@@ -53,9 +67,8 @@
   </div>
 </template>
 
-<script setup>
-import { ref } from "vue";
-import { data as stories } from "../mock/stories";
+<script setup lang="ts">
+import { computed, onMounted, ref } from "vue";
 
 import { Swiper, SwiperSlide } from "swiper/vue";
 import "swiper/css";
@@ -65,15 +78,49 @@ import SwiperCore from "swiper";
 import { RouteName } from "../router/keys";
 SwiperCore.use([Navigation]);
 
-const popularStoriesRef = ref(
-  JSON.parse(JSON.stringify(stories.filter((s) => s.rating > 6).slice(0, 10))),
-);
+interface Story {
+  id: number;
+  title: string;
+  cover: string;
+  rating: number;
+  created_at: string;
+  author?: string;
+}
 
-const newStories = ref(
-  JSON.parse(JSON.stringify(stories))
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    .slice(0, 10),
-);
+const stories = ref<Story[]>([]);
+const isLoading = ref(true);
+const errorMessage = ref<string | null>(null);
+
+const popularStoriesRef = computed(() => {
+  return stories.value.filter((s) => s.rating > 6).slice(0, 10);
+});
+
+const newStories = computed(() => {
+  return [...stories.value]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 10);
+});
+
+onMounted(async () => {
+  try {
+    const response = await fetch("http://localhost:3000/stories");
+    if (!response.ok) {
+      throw new Error("Backend response not OK");
+    }
+
+    const data = await response.json();
+    stories.value = data.map((story: any) => ({
+      ...story,
+      created_at: story.createdAt,
+    }));
+  } catch (error) {
+    console.error("Failed to load stories from backend:", error);
+    errorMessage.value = "Не удалось загрузить истории из базы. Повторите попытку позже.";
+    stories.value = [];
+  } finally {
+    isLoading.value = false;
+  }
+});
 </script>
 
 <style scoped>
@@ -126,8 +173,31 @@ const newStories = ref(
   margin-bottom: 10px;
 }
 
-.story-card h3 {
-  margin: 5px 0;
+.story-card-info {
+  padding: 10px 0;
+}
+
+.story-card-info h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  color: #111;
+}
+
+.story-card-info p {
+  margin: 2px 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.loading-state,
+.error-state {
+  padding: 16px 0;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.error-state {
+  color: #b91c1c;
 }
 .swiper-fade {
   position: relative;
