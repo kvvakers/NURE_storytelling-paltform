@@ -22,6 +22,16 @@ const routes = [
     name: RouteName.PROFILE,
     component: () => import("../views/Profile.vue"),
   },
+  {
+    path: "/create-story",
+    name: RouteName.CREATE_STORY,
+    component: () => import("../views/CreateStory.vue"),
+  },
+  {
+    path: "/write-chapter",
+    name: RouteName.WRITE_CHAPTER,
+    component: () => import("../views/WriteChapter.vue"),
+  },
 ];
 
 const router = createRouter({

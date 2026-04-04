@@ -6,7 +6,9 @@
         <p class="_p">Читайте, публикуйте и делитесь своими историями</p>
         <div class="hero-buttons">
           <button class="btn btn-primary">Начать читать</button>
-          <button class="btn btn-secondary">Опубликовать историю</button>
+          <RouterLink :to="{ name: RouteName.CREATE_STORY }" class="btn btn-secondary">
+            Опубликовать историю
+          </RouterLink>
         </div>
       </section>
 

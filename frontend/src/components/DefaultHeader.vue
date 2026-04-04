@@ -50,7 +50,7 @@ const search = () => {
 };
 
 const handleWrite = () => {
-  console.log("Write clicked");
+  router.push({ name: RouteName.CREATE_STORY });
 };
 
 const handleLogin = () => {

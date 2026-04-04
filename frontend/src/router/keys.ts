@@ -3,4 +3,6 @@ export const RouteName = Object.freeze({
   SEARCH: "search",
   STORY: "story",
   PROFILE: "profile",
+  CREATE_STORY: "create-story",
+  WRITE_CHAPTER: "write-chapter",
 });
