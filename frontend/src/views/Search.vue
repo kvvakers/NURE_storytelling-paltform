@@ -6,13 +6,61 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import { data as stories } from "../mock/stories";
 import Card from "../components/Card.vue";
 
+interface Story {
+  id: number;
+  title: string;
+  author: string;
+  description: string;
+  rating: number;
+  created_at: string;
+  cover: string;
+  genres: string[];
+}
+
+const API_BASE = "http://localhost:3000";
 const route = useRoute();
-console.log(route.params);
+const stories = ref<Story[]>([]);
+const isLoading = ref(true);
+const errorMessage = ref("");
+
+const searchQuery = computed(() => (route.params.query as string) || "");
+
+const loadStories = async () => {
+  isLoading.value = true;
+  errorMessage.value = "";
+
+  try {
+    const url = new URL(`${API_BASE}/stories`);
+    if (searchQuery.value) {
+      url.searchParams.append("query", searchQuery.value);
+    }
+
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      throw new Error("Backend response not OK");
+    }
+
+    const data = await response.json();
+    stories.value = data.map((story: any) => ({
+      ...story,
+      created_at: story.createdAt ?? story.created_at,
+    }));
+  } catch (error) {
+    console.error("Failed to load stories:", error);
+    errorMessage.value = "Не вдалося завантажити історії. Спробуйте пізніше.";
+    stories.value = [];
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+onMounted(loadStories);
+watch(() => route.params.query, loadStories);
 </script>
 
 <style scoped>

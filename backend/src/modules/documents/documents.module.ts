@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
 import { DocumentMeta } from '../../models/entities/postgres/document-meta.entity';
+import { AuthModule } from '../auth/auth.module';
 import {
   DocumentContent,
   DocumentContentSchema,
@@ -15,6 +16,7 @@ import {
     MongooseModule.forFeature([
       { name: DocumentContent.name, schema: DocumentContentSchema },
     ]),
+    AuthModule,
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService],

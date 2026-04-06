@@ -2,21 +2,21 @@
   <div class="home">
     <div class="_container">
       <section class="hero">
-        <h1 class="_h1">Платформа историй</h1>
-        <p class="_p">Читайте, публикуйте и делитесь своими историями</p>
+        <h1 class="_h1">Платформа історій</h1>
+        <p class="_p">Читайте, публікуйте та діліться своїми історіями</p>
         <div class="hero-buttons">
-          <button class="btn btn-primary">Начать читать</button>
+          <button class="btn btn-primary">Почати читати</button>
           <RouterLink :to="{ name: RouteName.CREATE_STORY }" class="btn btn-secondary">
-            Опубликовать историю
+            Опублікувати історію
           </RouterLink>
         </div>
       </section>
 
       <section class="section">
-        <h2 class="_h2">Популярное</h2>
-        <div v-if="isLoading" class="loading-state">Загрузка историй...</div>
+        <h2 class="_h2">Популярне</h2>
+        <div v-if="isLoading" class="loading-state">Завантаження історій...</div>
         <div v-if="errorMessage" class="error-state">{{ errorMessage }}</div>
-        <div v-if="!isLoading && stories.length === 0" class="loading-state">Пока нет доступных историй.</div>
+        <div v-if="!isLoading && stories.length === 0" class="loading-state">Поки немає доступних історій.</div>
         <swiper
           v-if="stories.length > 0"
           :slides-per-view="7"
@@ -31,7 +31,7 @@
                 <img :src="story.cover" alt="cover" />
                 <div class="story-card-info">
                   <h3>{{ story.title }}</h3>
-                  <p>{{ story.author || 'Автор не указан' }}</p>
+                  <p>{{ story.author || 'Автор не вказаний' }}</p>
                   <p>{{ new Date(story.created_at).toLocaleDateString() }}</p>
                 </div>
               </RouterLink>
@@ -41,7 +41,7 @@
       </section>
 
       <section v-if="stories.length > 0" class="section">
-        <h2 class="_h2">Новые истории</h2>
+        <h2 class="_h2">Нові історії</h2>
         <swiper
           :slides-per-view="7"
           :space-between="20"
@@ -55,8 +55,8 @@
                 <img :src="story.cover" alt="cover" />
                 <div class="story-card-info">
                   <h3>{{ story.title }}</h3>
-                  <p>{{ story.author || 'Автор не указан' }}</p>
-                  <p>{{ new Date(story.created_at).toLocaleDateString() }}</p>
+                  <p>{{ story.author || 'Автор не вказаний' }}</p>
+                  <p>{{ new Date(story.created_at).toLocaleDateString('uk-UA') }}</p>
                 </div>
               </RouterLink>
             </div>
@@ -115,7 +115,7 @@ onMounted(async () => {
     }));
   } catch (error) {
     console.error("Failed to load stories from backend:", error);
-    errorMessage.value = "Не удалось загрузить истории из базы. Повторите попытку позже.";
+    errorMessage.value = "Не вдалося завантажити історії з бази. Повторіть спробу пізніше.";
     stories.value = [];
   } finally {
     isLoading.value = false;

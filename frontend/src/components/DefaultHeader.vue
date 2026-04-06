@@ -12,25 +12,25 @@
             v-model="searchQuery"
             @keyup.enter="search"
             type="text"
-            placeholder="Search stories..."
+            placeholder="Пошук історій..."
             class="search-input"
           />
         </div>
       </div>
 
-      <RouterLink
-        v-if="userStore.isAuthorized"
-        :to="{ name: RouteName.PROFILE, params: { nickname: 'adf' } }"
-        class="profile _flex _ai-c"
-      >
-        <div class="profile-img"></div>
-        <div class="profile-name">name</div>
-      </RouterLink>
+      <div v-if="userStore.isAuthorized" class="actions">
+        <button class="btn btn-secondary" @click="handleWrite">Написати</button>
+        <button class="btn btn-secondary" @click="handleLogout">Вихід</button>
+        <RouterLink :to="{ name: RouteName.PROFILE, params: { nickname: userStore.user?.email || 'profile' } }" class="profile _flex _ai-c">
+          <div class="profile-img"></div>
+          <div class="profile-name">{{ userStore.user?.email }}</div>
+        </RouterLink>
+      </div>
 
       <div v-else class="actions">
-        <button class="btn btn-primary" @click="handleWrite">Write</button>
-        <button class="btn btn-secondary" @click="handleLogin">Login</button>
-        <button class="btn btn-signup" @click="handleSignUp">Sign Up</button>
+        <button class="btn btn-primary" @click="handleWrite">Написати</button>
+        <button class="btn btn-secondary" @click="handleLogin">Вхід</button>
+        <button class="btn btn-signup" @click="handleSignUp">Реєстрація</button>
       </div>
     </div>
   </header>
@@ -46,7 +46,9 @@ const userStore = useUserStore();
 const searchQuery = ref("");
 const router = useRouter();
 const search = () => {
-  router.push({ name: RouteName.SEARCH, params: { query: searchQuery.value } });
+  if (searchQuery.value.trim()) {
+    router.push({ name: RouteName.SEARCH, params: { query: searchQuery.value.trim() } });
+  }
 };
 
 const handleWrite = () => {
@@ -54,11 +56,16 @@ const handleWrite = () => {
 };
 
 const handleLogin = () => {
-  console.log("Login clicked");
+  router.push({ name: RouteName.LOGIN });
 };
 
 const handleSignUp = () => {
-  console.log("Sign Up clicked");
+  router.push({ name: RouteName.REGISTER });
+};
+
+const handleLogout = () => {
+  userStore.logout();
+  router.push({ name: RouteName.HOME });
 };
 </script>
 

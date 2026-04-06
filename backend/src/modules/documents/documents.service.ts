@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { InjectModel } from '@nestjs/mongoose';
 import { Repository } from 'typeorm';
@@ -10,6 +14,11 @@ import {
   DocumentContentDocument,
 } from '../../models/entities/mongo/document-content.schema';
 
+interface UpdateChapterDto {
+  title?: string;
+  content?: string;
+}
+
 @Injectable()
 export class DocumentsService {
   constructor(
@@ -19,7 +28,7 @@ export class DocumentsService {
     private readonly documentContentModel: Model<DocumentContentDocument>,
   ) {}
 
-  async createStory(createStoryDto: CreateStoryDto) {
+  async createStory(createStoryDto: CreateStoryDto, ownerId?: number) {
     const meta = this.documentMetaRepository.create({
       title: createStoryDto.title,
       description: createStoryDto.description,
@@ -30,9 +39,12 @@ export class DocumentsService {
       language: createStoryDto.language,
       cover: createStoryDto.cover,
       rating: 0,
+      ownerId,
     });
 
-    const savedMeta = await this.documentMetaRepository.save(meta);
+    const savedMeta = (await this.documentMetaRepository.save(
+      meta,
+    )) as DocumentMeta;
 
     const content = new this.documentContentModel({
       documentId: savedMeta.id,
@@ -43,7 +55,7 @@ export class DocumentsService {
         },
       ],
       history: [],
-    });
+    }) as DocumentContentDocument;
 
     await content.save();
 
@@ -63,10 +75,29 @@ export class DocumentsService {
     };
   }
 
-  async getAllStories() {
-    const metas = await this.documentMetaRepository.find({
-      order: { createdAt: 'DESC' },
-    });
+  async getAllStories(searchQuery?: string) {
+    let metas: DocumentMeta[];
+
+    if (!searchQuery || !searchQuery.trim()) {
+      metas = await this.documentMetaRepository.find({
+        order: { createdAt: 'DESC' },
+      });
+    } else {
+      const normalizedQuery = `%${searchQuery.toLowerCase()}%`;
+      metas = await this.documentMetaRepository
+        .createQueryBuilder('meta')
+        .where('LOWER(meta.title) LIKE :query', {
+          query: normalizedQuery,
+        })
+        .orWhere('LOWER(meta.description) LIKE :query', {
+          query: normalizedQuery,
+        })
+        .orWhere('LOWER(meta.author) LIKE :query', {
+          query: normalizedQuery,
+        })
+        .orderBy('meta.createdAt', 'DESC')
+        .getMany();
+    }
 
     return metas.map((meta) => ({
       id: meta.id,
@@ -83,7 +114,57 @@ export class DocumentsService {
     }));
   }
 
-  async getStoryById(id: number) {
+  async updateChapter(
+    id: number,
+    chapterIndex: number,
+    updateChapterDto: UpdateChapterDto,
+    userId?: number,
+  ) {
+    const meta = await this.documentMetaRepository.findOne({
+      where: { id },
+    });
+
+    if (!meta) {
+      throw new NotFoundException(`Story with id ${id} not found`);
+    }
+
+    if (userId == null || meta.ownerId !== userId) {
+      throw new ForbiddenException('You are not allowed to edit this chapter');
+    }
+
+    const content = await this.documentContentModel.findOne({
+      documentId: id,
+    });
+
+    if (!content) {
+      throw new NotFoundException(`Content for story ${id} not found`);
+    }
+
+    if (
+      chapterIndex < 0 ||
+      chapterIndex >= content.chapters.length ||
+      !content.chapters[chapterIndex]
+    ) {
+      throw new NotFoundException(
+        `Chapter index ${chapterIndex} not found for story ${id}`,
+      );
+    }
+
+    content.chapters[chapterIndex].title =
+      updateChapterDto.title || content.chapters[chapterIndex].title;
+    content.chapters[chapterIndex].content =
+      updateChapterDto.content || content.chapters[chapterIndex].content;
+
+    await content.save();
+
+    return {
+      id,
+      chapterIndex,
+      chapter: content.chapters[chapterIndex],
+    };
+  }
+
+  async getStoryById(id: number, userId?: number) {
     const meta = await this.documentMetaRepository.findOne({
       where: { id },
     });
@@ -108,6 +189,8 @@ export class DocumentsService {
       rating: meta.rating,
       createdAt: meta.createdAt.toISOString(),
       chapters: content?.chapters || [],
+      ownerId: meta.ownerId as number | undefined,
+      isMine: userId != null && meta.ownerId === userId,
     };
   }
 }

@@ -7,19 +7,19 @@
         <div class="profile-info">
           <div class="profile-title">
             <h1 class="nickname">{{ user.nickname }}</h1>
-            <button v-if="isCurrentUser" class="btn btn-secondary">Редактировать профиль</button>
-            <button v-else class="btn btn-primary">Подписаться +</button>
+            <button v-if="isCurrentUser" class="btn btn-secondary">Редагувати профіль</button>
+            <button v-else class="btn btn-primary">Підписатися +</button>
           </div>
 
           <div class="stats">
-            <div class="stat-item"><b>{{ user.storiesCount }}</b> работ</div>
-            <div class="stat-item"><b>{{ user.followers }}</b> подписчиков</div>
-            <div class="stat-item"><b>{{ user.following }}</b> подписок</div>
+            <div class="stat-item"><b>{{ user.storiesCount }}</b> праць</div>
+            <div class="stat-item"><b>{{ user.followers }}</b> підписчиків</div>
+            <div class="stat-item"><b>{{ user.following }}</b> підписок</div>
           </div>
 
           <div class="bio">
             <p>{{ user.bio }}</p>
-            <span class="reg-date">В сети с {{ formatDate(user.registered_at) }}</span>
+            <span class="reg-date">З саме {{ formatDate(user.registered_at) }}</span>
           </div>
         </div>
       </div>
@@ -28,7 +28,7 @@
     <hr class="divider" />
 
     <section class="user-stories">
-      <h3 class="section-title">Работы автора</h3>
+      <h3 class="section-title">Праці автора</h3>
       
       <div class="stories-grid">
         <div v-for="story in authorStories" :key="story.id" class="card">

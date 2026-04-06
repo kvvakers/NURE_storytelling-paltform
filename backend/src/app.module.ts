@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { MongooseModule } from '@nestjs/mongoose';
 import { UsersModule } from './modules/users/users.module';
 import { DocumentsModule } from './modules/documents/documents.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { DocumentsModule } from './modules/documents/documents.module';
     ),
 
     UsersModule,
+    AuthModule,
     DocumentsModule,
   ],
   controllers: [AppController],

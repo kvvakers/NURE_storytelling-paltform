@@ -2,7 +2,7 @@
   <div class="write-chapter">
     <div class="chapter-container">
       <div class="chapter-header">
-        <h1>Напишите первую главу</h1>
+        <h1>Напишіть перший розділ</h1>
         <p class="story-title">{{ storyData.title }}</p>
       </div>
 
@@ -12,7 +12,7 @@
           <input
             v-model="chapterData.title"
             type="text"
-            placeholder="Название главы"
+            placeholder="Назва розділу"
             required
             class="chapter-title-input"
           />
@@ -21,28 +21,46 @@
         <!-- Formatting Toolbar -->
         <div class="toolbar">
           <div class="toolbar-group">
-            <button type="button" @click="applyFormat('bold')" class="toolbar-btn" title="Жирный">
+            <button type="button" @click="applyFormat('bold')" class="toolbar-btn" title="Навдриження">
               <strong>B</strong>
             </button>
-            <button type="button" @click="applyFormat('italic')" class="toolbar-btn" title="Итальик">
+            <button type="button" @click="applyFormat('italic')" class="toolbar-btn" title="Курсив">
               <i>I</i>
             </button>
-            <button type="button" @click="applyFormat('underline')" class="toolbar-btn" title="Подчеркнутый">
+            <button type="button" @click="applyFormat('underline')" class="toolbar-btn" title="Підкреслення">
               <u>U</u>
             </button>
-            <button type="button" @click="applyFormat('strikethrough')" class="toolbar-btn" title="Зачеркнутый">
+            <button type="button" @click="applyFormat('strikethrough')" class="toolbar-btn" title="Зачеркнено">
               <s>S</s>
             </button>
           </div>
 
           <div class="toolbar-group">
-            <button type="button" @click="applyAlignment('left')" class="toolbar-btn" title="Выровнять слева">
+            <button type="button" @click="applyFormat('heading')" class="toolbar-btn" title="Заголовок H2">
+              H2
+            </button>
+            <button type="button" @click="applyFormat('quote')" class="toolbar-btn" title="Цитата">
+              ❝
+            </button>
+            <button type="button" @click="applyFormat('code')" class="toolbar-btn" title="Код">
+              &lt;/&gt;
+            </button>
+          </div>
+
+          <div class="toolbar-group">
+            <button type="button" @click="applyFormat('unorderedList')" class="toolbar-btn" title="МаркІйований список">
+              •
+            </button>
+            <button type="button" @click="applyFormat('orderedList')" class="toolbar-btn" title="Нумерований список">
+              1.
+            </button>
+            <button type="button" @click="applyAlignment('left')" class="toolbar-btn" title="Відрівняти іліво">
               ⬅
             </button>
-            <button type="button" @click="applyAlignment('center')" class="toolbar-btn" title="Выровнять по центру">
+            <button type="button" @click="applyAlignment('center')" class="toolbar-btn" title="По центру">
               ↔
             </button>
-            <button type="button" @click="applyAlignment('right')" class="toolbar-btn" title="Выровнять справа">
+            <button type="button" @click="applyAlignment('right')" class="toolbar-btn" title="Відрівняти праворуч">
               ➡
             </button>
           </div>
@@ -53,7 +71,7 @@
               @click="toggleCommentMode" 
               class="toolbar-btn"
               :class="{ active: isCommentMode }"
-              title="Режим комментариев"
+              title="Одина режим коментарів"
             >
               💬
             </button>
@@ -68,23 +86,23 @@
             @input="updateContent"
             @mouseup="handleTextSelection"
             class="chapter-content-editor"
-            placeholder="Начните писать вашу историю здесь..."
+            placeholder="Почніть писати вашу історію тут..."
           ></div>
 
           <!-- Comments Panel -->
           <div v-if="showCommentPanel" class="comment-panel">
             <div class="comment-header">
-              <h3>Комментарии к выделению</h3>
+              <h3>Коментарі до виділення</h3>
               <button type="button" @click="cancelComment" class="close-btn">×</button>
             </div>
             <div class="comment-input-group">
               <textarea
                 v-model="newComment"
-                placeholder="Введите ваш комментарий..."
+                placeholder="Введіть ваш коментар..."
                 class="comment-input"
               ></textarea>
               <button type="button" @click="addComment" class="btn btn-primary">
-                Добавить комментарий
+                Додати коментар
               </button>
             </div>
           </div>
@@ -92,29 +110,29 @@
 
         <!-- Comments Display -->
         <div v-if="comments.length > 0" class="comments-section">
-          <h3>Комментарии ({{ comments.length }})</h3>
+          <h3>Коментарі ({{ comments.length }})</h3>
           <div v-for="(comment, index) in comments" :key="index" class="comment-item">
             <div class="comment-text">
               <span class="comment-quote">"{{ comment.selectedText }}"</span>
               <p>{{ comment.text }}</p>
             </div>
             <button type="button" @click="deleteComment(index)" class="delete-comment-btn">
-              Удалить
+              Видалити
             </button>
           </div>
         </div>
 
         <!-- Submit Actions -->
         <div class="form-actions">
-          <button type="submit" class="btn btn-primary">Сохранить главу</button>
-          <button type="button" @click="saveDraft" class="btn btn-secondary">Сохранить как черновик</button>
+          <button type="submit" class="btn btn-primary">Зберегти розділ</button>
+          <button type="button" @click="saveDraft" class="btn btn-secondary">Зберегти як черновик</button>
           <button type="button" @click="goBack" class="btn btn-outline">Назад</button>
         </div>
       </form>
 
       <!-- Word Count -->
       <div class="word-count">
-        Слов: {{ wordCount }} | Символов: {{ chapterData.content.length }}
+        Слов: {{ wordCount }} | Символів: {{ chapterData.content.length }}
       </div>
     </div>
   </div>
@@ -124,9 +142,11 @@
 import { ref, computed, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { RouteName } from "../router/keys";
+import { useUserStore } from "../stores/user";
 
 const router = useRouter();
 const route = useRoute();
+const userStore = useUserStore();
 
 interface Comment {
   selectedText: string;
@@ -165,10 +185,13 @@ const wordCount = computed(() => {
     .length;
 });
 
+const API_BASE = "http://localhost:3000";
+
 onMounted(() => {
-  if (route.params.storyData) {
+  const storyDataParam = route.query.storyData;
+  if (storyDataParam) {
     try {
-      storyData.value = JSON.parse(route.params.storyData as string);
+      storyData.value = JSON.parse(storyDataParam as string);
     } catch (e) {
       console.error("Failed to parse story data:", e);
     }
@@ -195,8 +218,16 @@ const handleTextSelection = () => {
 
 const applyFormat = (format: string) => {
   const selection = window.getSelection();
-  if (!selection || selection.toString().length === 0) {
-    alert("Пожалуйста, выделите текст сначала");
+  const isBlockCommand = [
+    "heading",
+    "quote",
+    "code",
+    "unorderedList",
+    "orderedList",
+  ].includes(format);
+
+  if (!selection || (selection.toString().length === 0 && !isBlockCommand)) {
+    alert("Будь ласка, виділіть текст спочатку");
     return;
   }
 
@@ -214,6 +245,23 @@ const applyFormat = (format: string) => {
       break;
     case "strikethrough":
       document.execCommand("strikethrough", false);
+      break;
+    case "heading":
+      document.execCommand("formatBlock", false, "H2");
+      break;
+    case "quote":
+      document.execCommand("formatBlock", false, "BLOCKQUOTE");
+      break;
+    case "code":
+      document.execCommand("formatBlock", false, "PRE");
+      break;
+    case "unorderedList":
+      document.execCommand("insertUnorderedList", false);
+      break;
+    case "orderedList":
+      document.execCommand("insertOrderedList", false);
+      break;
+    default:
       break;
   }
 
@@ -254,7 +302,7 @@ const toggleCommentMode = () => {
 
 const addComment = () => {
   if (!selectedText.value.trim() || !newComment.value.trim()) {
-    alert("Пожалуйста, выделите текст и введите комментарий");
+    alert("Будь ласка, виділіть текст і введіть коментар");
     return;
   }
 
@@ -278,12 +326,12 @@ const deleteComment = (index: number) => {
 
 const submitChapter = async () => {
   if (!chapterData.value.title.trim()) {
-    alert("Пожалуйста, введите название главы");
+    alert("Будь ласка, введіть назву розділу");
     return;
   }
 
   if (!chapterData.value.content.trim()) {
-    alert("Пожалуйста, введите текст главы");
+    alert("Будь ласка, введіть текст розділу");
     return;
   }
 
@@ -308,10 +356,17 @@ const submitChapter = async () => {
       },
     };
 
-    const response = await fetch("http://localhost:3000/stories", {
+    if (!userStore.isAuthorized || !userStore.token) {
+      alert("Будь ласка, вйдіть в систему, щоб опублікувати історію.");
+      router.push({ name: RouteName.LOGIN });
+      return;
+    }
+
+    const response = await fetch(`${API_BASE}/stories`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${userStore.token}`,
       },
       body: JSON.stringify(payload),
     });
@@ -418,17 +473,17 @@ const goBack = () => {
   display: flex;
   gap: 12px;
   padding: 12px;
-  background-color: #f8f9fa;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px 8px 0 0;
+  background-color: #f7f8fa;
+  border: 1px solid #dfe1e6;
+  border-radius: 12px;
   flex-wrap: wrap;
 }
 
 .toolbar-group {
   display: flex;
   gap: 4px;
-  border-right: 1px solid #ddd;
   padding-right: 12px;
+  border-right: 1px solid #e2e4e8;
 }
 
 .toolbar-group:last-child {
@@ -467,6 +522,8 @@ const goBack = () => {
 
 .chapter-content-editor {
   flex: 1;
+  min-width: 0;
+  width: 100%;
   padding: 20px;
   font-size: 1.05rem;
   line-height: 1.8;
@@ -477,8 +534,10 @@ const goBack = () => {
   outline: none;
   transition: border-color 0.3s ease;
   background-color: white;
+  white-space: pre-wrap;
   word-wrap: break-word;
   overflow-wrap: break-word;
+  overflow-y: auto;
 }
 
 .chapter-content-editor:focus {

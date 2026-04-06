@@ -10,9 +10,9 @@
         <div class="story-info">
           <h1 class="_h1">{{ story.title }}</h1>
           <p><b>Автор:</b> {{ story.author }}</p>
-          <p><b>Описание:</b> {{ story.description }}</p>
+          <p><b>Опис:</b> {{ story.description }}</p>
           <p><b>Рейтинг:</b> {{ story.rating }}/10</p>
-          <p><b>Дата публикации:</b> {{ new Date(story.createdAt).toLocaleDateString() }}</p>
+          <p><b>Дата публікації:</b> {{ new Date(story.createdAt).toLocaleDateString('uk-UA') }}</p>
 
           <div class="genres">
             <span v-for="g in story.genres" :key="g" class="genre">
@@ -36,11 +36,43 @@
           </button>
         </div>
 
+        <div class="chapter-actions">
+          <button
+            v-if="story?.isMine && !isEditingChapter"
+            type="button"
+            class="btn btn-secondary"
+            @click="startChapterEdit"
+          >
+            Редагувати главу
+          </button>
+        </div>
+
         <div class="chapter-content">
-          <h2>{{ activeChapter.title }}</h2>
-          
-          <!-- Chapter Text with Comment Support -->
-          <div class="text-content">
+          <h2>{{ isEditingChapter ? editChapterTitle : activeChapter.title }}</h2>
+
+          <div v-if="isEditingChapter" class="chapter-edit-area">
+            <input
+              v-model="editChapterTitle"
+              type="text"
+              class="chapter-edit-title"
+            placeholder="Назва розділу"
+            />
+            <textarea
+              v-model="editChapterContent"
+              class="chapter-edit-text"
+              rows="14"
+            ></textarea>
+            <div class="chapter-edit-actions">
+              <button type="button" class="btn btn-primary" @click="saveChapterEdit">
+                Зберегти
+              </button>
+              <button type="button" class="btn btn-secondary" @click="cancelChapterEdit">
+                Скасувати
+              </button>
+            </div>
+          </div>
+
+          <div v-else class="text-content">
             <div
               ref="chapterTextRef"
               @mouseup="handleTextSelection"
@@ -55,34 +87,34 @@
               :style="tooltipPosition"
             >
               <button @click="openCommentInput" class="comment-tooltip-btn">
-                💬 Добавить комментарий
+                🗣 Додати коментар
               </button>
             </div>
 
             <!-- Comment Input Panel -->
             <div v-if="showCommentPanel" class="comment-input-panel">
               <div class="comment-panel-header">
-                <h3>Добавить комментарий</h3>
+                <h3>Додати коментар</h3>
                 <button type="button" @click="closeCommentPanel" class="close-btn">×</button>
               </div>
               
               <div class="comment-quote-preview">
-                <p><strong>Выделенный текст:</strong></p>
+                <p><strong>Виділений текст:</strong></p>
                 <p class="quote">"{{ selectedText }}"</p>
               </div>
 
               <textarea
                 v-model="newCommentText"
-                placeholder="Напишите ваш комментарий..."
+                placeholder="Напишіть ваш коментар..."
                 class="comment-textarea"
               ></textarea>
 
               <div class="comment-panel-actions">
                 <button @click="submitComment" class="btn btn-primary">
-                  Опубликовать комментарий
+                  Опублікувати коментар
                 </button>
                 <button @click="closeCommentPanel" class="btn btn-secondary">
-                  Отмена
+                  Скасувати
                 </button>
               </div>
             </div>
@@ -90,7 +122,7 @@
 
           <!-- Comments Display -->
           <div v-if="activeChapterComments.length > 0" class="comments-display">
-            <h3>Комментарии читателей ({{ activeChapterComments.length }})</h3>
+            <h3>Коментари читачів ({{ activeChapterComments.length }})</h3>
 
             <div v-for="(comment, idx) in activeChapterComments" :key="idx" class="comment-block">
               <div class="comment-quote-section">
@@ -100,7 +132,7 @@
               <div class="comment-content">
                 <p class="comment-text">{{ comment.text }}</p>
                 <div class="comment-meta">
-                  <span class="comment-author">{{ comment.author || 'Анонимный' }}</span>
+                  <span class="comment-author">{{ comment.author || 'Анонімний' }}</span>
                   <span class="comment-date">{{ formatDate(comment.date) }}</span>
                 </div>
               </div>
@@ -116,21 +148,21 @@
               </div>
 
               <button @click="toggleReplyForm(idx)" class="reply-btn">
-                {{ expandedReplyIndex === idx ? 'Скрыть ответ' : 'Ответить' }}
+                {{ expandedReplyIndex === idx ? 'Скрити відповідь' : 'Відповідати' }}
               </button>
 
               <div v-if="expandedReplyIndex === idx" class="reply-input-section">
                 <textarea
                   v-model="replyText"
-                  placeholder="Напишите ответ..."
+                  placeholder="Напишіть відповідь..."
                   class="reply-textarea"
                 ></textarea>
                 <div class="reply-actions">
                   <button @click="submitReply(idx)" class="btn btn-primary">
-                    Отправить ответ
+                    Надіслати відповідь
                   </button>
                   <button @click="toggleReplyForm(-1)" class="btn btn-secondary">
-                    Отмена
+                    Скасувати
                   </button>
                 </div>
               </div>
@@ -142,13 +174,14 @@
   </div>
 
   <div v-else class="not-found">
-    <p>История не найдена</p>
+    <p>Історія не знайдена</p>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, onMounted, watch } from "vue";
 import { useRoute } from "vue-router";
+import { useUserStore } from "../stores/user";
 
 interface Reply {
   text: string;
@@ -179,12 +212,18 @@ interface Story {
   cover: string;
   genres: string[];
   chapters: Chapter[];
+  ownerId?: number;
+  isMine?: boolean;
 }
 
 const route = useRoute();
+const userStore = useUserStore();
 const story = ref<Story | null>(null);
 const chapters = ref<Chapter[]>([]);
 const activeChapterIndex = ref(0);
+const isEditingChapter = ref(false);
+const editChapterTitle = ref("");
+const editChapterContent = ref("");
 
 const activeChapter = computed(() => {
   return chapters.value[activeChapterIndex.value] || { title: "", content: "" };
@@ -212,7 +251,14 @@ const loadStory = async () => {
   }
 
   try {
-    const response = await fetch(`http://localhost:3000/stories/${id}`);
+    const headers: Record<string, string> = {};
+    if (userStore.isAuthorized && userStore.token) {
+      headers.Authorization = `Bearer ${userStore.token}`;
+    }
+
+    const response = await fetch(`http://localhost:3000/stories/${id}`, {
+      headers,
+    });
     if (!response.ok) {
       story.value = null;
       return;
@@ -223,6 +269,8 @@ const loadStory = async () => {
     chapters.value = data.chapters || [];
     chapterComments.value = Array(chapters.value.length).fill([]);
     activeChapterIndex.value = 0;
+    editChapterTitle.value = chapters.value[0]?.title || "";
+    editChapterContent.value = chapters.value[0]?.content || "";
   } catch (error) {
     console.error("Failed to load story:", error);
     story.value = null;
@@ -236,6 +284,72 @@ watch(
     loadStory();
   },
 );
+
+watch(activeChapterIndex, () => {
+  if (!isEditingChapter.value) {
+    editChapterTitle.value = activeChapter.value.title;
+    editChapterContent.value = activeChapter.value.content;
+  }
+});
+
+const startChapterEdit = () => {
+  if (!story.value?.isMine) {
+    return;
+  }
+
+  isEditingChapter.value = true;
+  editChapterTitle.value = activeChapter.value.title;
+  editChapterContent.value = activeChapter.value.content;
+};
+
+const cancelChapterEdit = () => {
+  isEditingChapter.value = false;
+  editChapterTitle.value = activeChapter.value.title;
+  editChapterContent.value = activeChapter.value.content;
+};
+
+const saveChapterEdit = async () => {
+  if (!story.value) {
+    return;
+  }
+
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (userStore.isAuthorized && userStore.token) {
+      headers.Authorization = `Bearer ${userStore.token}`;
+    }
+
+    const response = await fetch(
+      `http://localhost:3000/stories/${story.value.id}/chapters/${activeChapterIndex.value}`,
+      {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          title: editChapterTitle.value,
+          content: editChapterContent.value,
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to save chapter');
+    }
+
+    const updated = await response.json();
+    const currentChapter = chapters.value[activeChapterIndex.value];
+    if (currentChapter && updated?.chapter) {
+      currentChapter.title = updated.chapter.title;
+      currentChapter.content = updated.chapter.content;
+    }
+    isEditingChapter.value = false;
+    alert('Глава успешно сохранена');
+  } catch (error) {
+    console.error('Error saving chapter:', error);
+    alert('Не удалось сохранить главу');
+  }
+};
 
 const handleTextSelection = () => {
   const selection = window.getSelection();
@@ -273,7 +387,7 @@ const closeCommentPanel = () => {
 
 const submitComment = () => {
   if (!selectedText.value.trim() || !newCommentText.value.trim()) {
-    alert("Пожалуйста, выделите текст и введите комментарий");
+    alert("Будь ласка, виділіть текст і введіть коментар");
     return;
   }
 
@@ -302,7 +416,7 @@ const toggleReplyForm = (index: number) => {
 
 const submitReply = (commentIndex: number) => {
   if (!replyText.value.trim()) {
-    alert("Пожалуйста, напишите ответ");
+    alert("Будь ласка, напишіть відповідь");
     return;
   }
 
@@ -453,6 +567,44 @@ const formatDate = (date: string | Date) => {
   margin-top: 0;
   margin-bottom: 30px;
   font-size: 1.8rem;
+}
+
+.chapter-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin: 0 0 20px;
+}
+
+.chapter-edit-area {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 40px;
+}
+
+.chapter-edit-title {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid #dcdcdc;
+  border-radius: 10px;
+  font-size: 1.1rem;
+}
+
+.chapter-edit-text {
+  width: 100%;
+  min-height: 320px;
+  padding: 16px;
+  border: 1px solid #dcdcdc;
+  border-radius: 12px;
+  font-size: 1rem;
+  line-height: 1.8;
+  resize: vertical;
+}
+
+.chapter-edit-actions {
+  display: flex;
+  gap: 12px;
 }
 
 .text-content {

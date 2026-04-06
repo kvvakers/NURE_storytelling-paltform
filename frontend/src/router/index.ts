@@ -32,6 +32,16 @@ const routes = [
     name: RouteName.WRITE_CHAPTER,
     component: () => import("../views/WriteChapter.vue"),
   },
+  {
+    path: "/login",
+    name: RouteName.LOGIN,
+    component: () => import("../views/Login.vue"),
+  },
+  {
+    path: "/register",
+    name: RouteName.REGISTER,
+    component: () => import("../views/Register.vue"),
+  },
 ];
 
 const router = createRouter({

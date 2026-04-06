@@ -2,10 +2,8 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
-  ManyToOne,
   CreateDateColumn,
 } from 'typeorm';
-import { User } from './user.entity';
 
 @Entity('documents')
 export class DocumentMeta {
@@ -39,8 +37,8 @@ export class DocumentMeta {
   @Column({ type: 'int', default: 0 })
   rating: number;
 
-  @ManyToOne(() => User, { nullable: true })
-  owner?: User;
+  @Column({ type: 'int', nullable: true })
+  ownerId?: number;
 
   @CreateDateColumn()
   createdAt: Date;

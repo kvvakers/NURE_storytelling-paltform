@@ -1,12 +1,12 @@
 <template>
   <div class="create-story">
     <div class="_container">
-      <h1 class="_h1">Создать историю</h1>
+      <h1 class="_h1">Створити історію</h1>
       
       <form @submit.prevent="submitStory" class="form">
         <!-- Cover Image -->
         <div class="form-group">
-          <label for="cover">Обложка</label>
+          <label for="cover">Обкладинка</label>
           <div class="image-upload">
             <div v-if="previewImage" class="image-preview">
               <img :src="previewImage" :alt="formData.title || 'Preview'" />
@@ -18,7 +18,7 @@
                 <polyline points="17 8 12 3 7 8"></polyline>
                 <line x1="12" y1="3" x2="12" y2="15"></line>
               </svg>
-              <p>Загрузите обложку</p>
+              <p>Завантажте обкладинку</p>
             </div>
             <input
               id="cover"
@@ -37,7 +37,7 @@
             id="title"
             v-model="formData.title"
             type="text"
-            placeholder="Введите название истории"
+            placeholder="Введіть назву історії"
             required
             class="input"
           />
@@ -45,11 +45,11 @@
 
         <!-- Description -->
         <div class="form-group">
-          <label for="description">Описание</label>
+          <label for="description">Опис</label>
           <textarea
             id="description"
             v-model="formData.description"
-            placeholder="Опишите вашу историю"
+            placeholder="Опишіть вашу історію"
             rows="6"
             required
             class="textarea"
@@ -58,19 +58,19 @@
 
         <!-- Main Characters -->
         <div class="form-group">
-          <label for="characters">Главные персонажи</label>
+          <label for="characters">Головні персонажі</label>
           <input
             id="characters"
             v-model="formData.characters"
             type="text"
-            placeholder="Персонажи через запятую (например: Иван, Мария, Петр)"
+            placeholder="Персонажі через кому (наприклад: Іван, Марія, Петро)"
             class="input"
           />
         </div>
 
         <!-- Categories (Genres) -->
         <div class="form-group">
-          <label>Категория (жанр)</label>
+          <label>Категорія (жанр)</label>
           <div class="checkbox-group">
             <label v-for="genre in availableGenres" :key="genre" class="checkbox-label">
               <input
@@ -91,7 +91,7 @@
             id="tags"
             v-model="formData.tags"
             type="text"
-            placeholder="Теги через запятую (например: фантастика, приключение, любовь)"
+            placeholder="Теги через кому (наприклад: фантастика, пригода, любов)"
             class="input"
           />
           <div class="tags-preview">
@@ -108,9 +108,9 @@
 
         <!-- Language -->
         <div class="form-group">
-          <label for="language">Язык</label>
+          <label for="language">Мова</label>
           <select v-model="formData.language" id="language" class="select" required>
-            <option value="">Выберите язык</option>
+            <option value="">Виберіть мову</option>
             <option value="uk">Українська</option>
             <option value="ru">Русский</option>
             <option value="en">English</option>
@@ -205,22 +205,22 @@ const submitStory = async () => {
   updateTags();
   
   if (!formData.value.title.trim()) {
-    alert("Пожалуйста, введите название");
+    alert("Будь ласка, введіть назву");
     return;
   }
 
   if (!formData.value.description.trim()) {
-    alert("Пожалуйста, введите описание");
+    alert("Будь ласка, введіть опис");
     return;
   }
 
   if (formData.value.genres.length === 0) {
-    alert("Пожалуйста, выберите хотя бы один жанр");
+    alert("Будь ласка, виберіть принаймні один жанр");
     return;
   }
 
   if (!formData.value.language) {
-    alert("Пожалуйста, выберите язык");
+    alert("Будь ласка, виберіть мову");
     return;
   }
 
@@ -232,14 +232,14 @@ const submitStory = async () => {
       genres: formData.value.genres,
       tags: parsedTags.value,
       language: formData.value.language,
-      cover: formData.value.cover
+      cover: formData.value.cover,
     };
 
     router.push({
       name: RouteName.WRITE_CHAPTER,
-      params: {
-        storyData: JSON.stringify(storyPayload)
-      }
+      query: {
+        storyData: JSON.stringify(storyPayload),
+      },
     });
   } catch (error) {
     console.error("Error submitting story:", error);
