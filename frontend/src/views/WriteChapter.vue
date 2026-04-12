@@ -1,157 +1,189 @@
-<template>
-  <div class="write-chapter">
-    <div class="chapter-container">
-      <div class="chapter-header">
-        <h1>Напишіть перший розділ</h1>
-        <p class="story-title">{{ storyData.title }}</p>
+﻿<template>
+  <div class="docs-app">
+    <!-- Top bar -->
+    <div class="docs-topbar">
+      <div class="docs-topbar-left">
+        <div class="docs-title-block">
+          <input v-model="chapterData.title" type="text" class="docs-title-input" placeholder="Назва розділу" />
+          <div class="docs-subtitle">{{ isAddChapterMode ? existingStoryTitle : storyData.title }}</div>
+        </div>
+      </div>
+      <div class="docs-topbar-right">
+        <div class="word-count-badge">Слів: {{ wordCount }} | Символів: {{ charCount }}</div>
+        <button class="docs-btn-share" @click="submitChapter">{{ isEditChapterMode ? 'Зберегти зміни' : 'Опублікувати' }}</button>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="docs-toolbar" v-if="editor">
+      <!-- Undo / Redo -->
+      <div class="tb-group">
+        <button class="tb-btn" @click="editor.chain().focus().undo().run()" title="Скасувати (Ctrl+Z)" :disabled="!editor.can().undo()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
+        </button>
+        <button class="tb-btn" @click="editor.chain().focus().redo().run()" title="Повторити (Ctrl+Y)" :disabled="!editor.can().redo()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>
+        </button>
+      </div>
+      <div class="tb-divider"></div>
+
+      <!-- Text style -->
+      <div class="tb-group">
+        <select class="tb-select" @change="applyHeading($event)" title="Стиль тексту">
+          <option value="paragraph">Текст</option>
+          <option value="1">Заголовок 1</option>
+          <option value="2">Заголовок 2</option>
+          <option value="3">Заголовок 3</option>
+        </select>
+      </div>
+      <div class="tb-divider"></div>
+
+      <!-- Formatting -->
+      <div class="tb-group">
+        <button class="tb-btn tb-fmt" :class="{ active: editor.isActive('bold') }" @click="editor.chain().focus().toggleBold().run()" title="Жирний (Ctrl+B)"><strong>B</strong></button>
+        <button class="tb-btn tb-fmt" :class="{ active: editor.isActive('italic') }" @click="editor.chain().focus().toggleItalic().run()" title="Курсив (Ctrl+I)"><em>I</em></button>
+        <button class="tb-btn tb-fmt" :class="{ active: editor.isActive('underline') }" @click="editor.chain().focus().toggleUnderline().run()" title="Підкреслення (Ctrl+U)"><u>U</u></button>
+        <button class="tb-btn tb-fmt" :class="{ active: editor.isActive('strike') }" @click="editor.chain().focus().toggleStrike().run()" title="Закреслення"><s>S</s></button>
+      </div>
+      <div class="tb-divider"></div>
+
+      <!-- Alignment -->
+      <div class="tb-group">
+        <button class="tb-btn" :class="{ active: editor.isActive({ textAlign: 'left' }) }" @click="editor.chain().focus().setTextAlign('left').run()" title="Ліворуч">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h18v2H3zm0 4h12v2H3zm0 4h18v2H3zm0 4h12v2H3zm0 4h18v2H3z"/></svg>
+        </button>
+        <button class="tb-btn" :class="{ active: editor.isActive({ textAlign: 'center' }) }" @click="editor.chain().focus().setTextAlign('center').run()" title="По центру">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h18v2H3zm3 4h12v2H6zm-3 4h18v2H3zm3 4h12v2H6zm-3 4h18v2H3z"/></svg>
+        </button>
+        <button class="tb-btn" :class="{ active: editor.isActive({ textAlign: 'right' }) }" @click="editor.chain().focus().setTextAlign('right').run()" title="Праворуч">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h18v2H3zm6 4h12v2H9zm-6 4h18v2H3zm6 4h12v2H9zm-6 4h18v2H3z"/></svg>
+        </button>
+        <button class="tb-btn" :class="{ active: editor.isActive({ textAlign: 'justify' }) }" @click="editor.chain().focus().setTextAlign('justify').run()" title="По ширині">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h18v2H3zm0 4h18v2H3zm0 4h18v2H3zm0 4h18v2H3zm0 4h18v2H3z"/></svg>
+        </button>
+      </div>
+      <div class="tb-divider"></div>
+
+      <!-- Lists & quote -->
+      <div class="tb-group">
+        <button class="tb-btn" :class="{ active: editor.isActive('bulletList') }" @click="editor.chain().focus().toggleBulletList().run()" title="Маркований список">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="4" cy="6" r="1.5"/><rect x="8" y="5" width="13" height="2"/><circle cx="4" cy="12" r="1.5"/><rect x="8" y="11" width="13" height="2"/><circle cx="4" cy="18" r="1.5"/><rect x="8" y="17" width="13" height="2"/></svg>
+        </button>
+        <button class="tb-btn" :class="{ active: editor.isActive('orderedList') }" @click="editor.chain().focus().toggleOrderedList().run()" title="Нумерований список">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M2 17h2v.5H3v1h1v.5H2v1h3v-4H2v1zm1-9h1V4H2v1h1v3zm-1 3h1.8L2 13.1v.9h3v-1H3.2L5 10.9V10H2v1zm5-8v2h14V3H7zm0 14h14v-2H7v2zm0-6h14V9H7v2z"/></svg>
+        </button>
+        <button class="tb-btn" :class="{ active: editor.isActive('blockquote') }" @click="editor.chain().focus().toggleBlockquote().run()" title="Цитата">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M6 17h3l2-4V7H5v6h3zm8 0h3l2-4V7h-6v6h3z"/></svg>
+        </button>
+      </div>
+      <div class="tb-divider"></div>
+
+      <!-- Comment button -->
+      <div class="tb-group">
+        <button
+          class="tb-btn tb-comment-btn"
+          :class="{ active: isCommentMode, disabled: !hasSelection }"
+          :disabled="!hasSelection"
+          @click="openCommentInput"
+          title="Додати коментар до виділення"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span class="tb-comment-label">Коментар</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Main content area -->
+    <div class="docs-main">
+      <!-- Page -->
+      <div class="docs-page-area">
+        <div class="docs-page">
+          <editor-content :editor="editor" class="docs-editor-content" @mouseup="onEditorMouseUp" />
+        </div>
       </div>
 
-      <form @submit.prevent="submitChapter" class="chapter-form">
-        <!-- Chapter Title -->
-        <div class="form-group">
-          <input
-            v-model="chapterData.title"
-            type="text"
-            placeholder="Назва розділу"
-            required
-            class="chapter-title-input"
-          />
+      <!-- Comments sidebar -->
+      <div class="docs-sidebar" v-if="comments.length > 0 || showCommentInput">
+        <div class="sidebar-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Коментарі
         </div>
 
-        <!-- Formatting Toolbar -->
-        <div class="toolbar">
-          <div class="toolbar-group">
-            <button type="button" @click="applyFormat('bold')" class="toolbar-btn" title="Навдриження">
-              <strong>B</strong>
-            </button>
-            <button type="button" @click="applyFormat('italic')" class="toolbar-btn" title="Курсив">
-              <i>I</i>
-            </button>
-            <button type="button" @click="applyFormat('underline')" class="toolbar-btn" title="Підкреслення">
-              <u>U</u>
-            </button>
-            <button type="button" @click="applyFormat('strikethrough')" class="toolbar-btn" title="Зачеркнено">
-              <s>S</s>
-            </button>
-          </div>
-
-          <div class="toolbar-group">
-            <button type="button" @click="applyFormat('heading')" class="toolbar-btn" title="Заголовок H2">
-              H2
-            </button>
-            <button type="button" @click="applyFormat('quote')" class="toolbar-btn" title="Цитата">
-              ❝
-            </button>
-            <button type="button" @click="applyFormat('code')" class="toolbar-btn" title="Код">
-              &lt;/&gt;
-            </button>
-          </div>
-
-          <div class="toolbar-group">
-            <button type="button" @click="applyFormat('unorderedList')" class="toolbar-btn" title="МаркІйований список">
-              •
-            </button>
-            <button type="button" @click="applyFormat('orderedList')" class="toolbar-btn" title="Нумерований список">
-              1.
-            </button>
-            <button type="button" @click="applyAlignment('left')" class="toolbar-btn" title="Відрівняти іліво">
-              ⬅
-            </button>
-            <button type="button" @click="applyAlignment('center')" class="toolbar-btn" title="По центру">
-              ↔
-            </button>
-            <button type="button" @click="applyAlignment('right')" class="toolbar-btn" title="Відрівняти праворуч">
-              ➡
-            </button>
-          </div>
-
-          <div class="toolbar-group">
-            <button 
-              type="button" 
-              @click="toggleCommentMode" 
-              class="toolbar-btn"
-              :class="{ active: isCommentMode }"
-              title="Одина режим коментарів"
-            >
-              💬
-            </button>
+        <!-- New comment input -->
+        <div v-if="showCommentInput" class="comment-new">
+          <div class="comment-quote-preview">«{{ pendingSelectedText }}»</div>
+          <textarea
+            v-model="pendingCommentText"
+            class="comment-textarea"
+            placeholder="Ваш коментар..."
+            rows="3"
+            autofocus
+          ></textarea>
+          <div class="comment-new-actions">
+            <button class="btn-comment-cancel" @click="cancelComment">Скасувати</button>
+            <button class="btn-comment-save" @click="saveComment" :disabled="!pendingCommentText.trim()">Зберегти</button>
           </div>
         </div>
 
-        <!-- Chapter Content Editor -->
-        <div class="editor-container">
-          <div
-            ref="contentEditable"
-            contenteditable="true"
-            @input="updateContent"
-            @mouseup="handleTextSelection"
-            class="chapter-content-editor"
-            placeholder="Почніть писати вашу історію тут..."
-          ></div>
-
-          <!-- Comments Panel -->
-          <div v-if="showCommentPanel" class="comment-panel">
-            <div class="comment-header">
-              <h3>Коментарі до виділення</h3>
-              <button type="button" @click="cancelComment" class="close-btn">×</button>
-            </div>
-            <div class="comment-input-group">
-              <textarea
-                v-model="newComment"
-                placeholder="Введіть ваш коментар..."
-                class="comment-input"
-              ></textarea>
-              <button type="button" @click="addComment" class="btn btn-primary">
-                Додати коментар
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Comments Display -->
-        <div v-if="comments.length > 0" class="comments-section">
-          <h3>Коментарі ({{ comments.length }})</h3>
-          <div v-for="(comment, index) in comments" :key="index" class="comment-item">
-            <div class="comment-text">
-              <span class="comment-quote">"{{ comment.selectedText }}"</span>
-              <p>{{ comment.text }}</p>
-            </div>
-            <button type="button" @click="deleteComment(index)" class="delete-comment-btn">
-              Видалити
+        <!-- Comment list -->
+        <div v-for="comment in comments" :key="comment.id" class="comment-card">
+          <div class="comment-author">
+            <div class="comment-avatar">{{ userStore.user?.nickname?.[0]?.toUpperCase() || 'A' }}</div>
+            <span class="comment-author-name">{{ userStore.user?.nickname || userStore.user?.email }}</span>
+            <button class="comment-delete" @click="removeComment(comment.id)" title="Видалити">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
+          <div class="comment-quote">«{{ comment.selectedText }}»</div>
+          <div class="comment-text">{{ comment.text }}</div>
         </div>
+      </div>
+    </div>
 
-        <!-- Submit Actions -->
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary">Зберегти розділ</button>
-          <button type="button" @click="saveDraft" class="btn btn-secondary">Зберегти як черновик</button>
-          <button type="button" @click="goBack" class="btn btn-outline">Назад</button>
-        </div>
-      </form>
-
-      <!-- Word Count -->
-      <div class="word-count">
-        Слов: {{ wordCount }} | Символів: {{ chapterData.content.length }}
+    <!-- Bottom bar -->
+    <div class="docs-bottombar">
+      <div class="docs-bottombar-left">
+        <span>Глава:</span>
+        <input v-model="chapterData.title" class="docs-chapter-mini" placeholder="Назва розділу" />
+        <span class="docs-story-name" v-if="storyData.title || isAddChapterMode">— {{ isAddChapterMode ? existingStoryTitle : storyData.title }}</span>
+      </div>
+      <div class="docs-bottombar-right">
+        <button class="docs-btn-secondary" @click="saveDraft">Зберегти чернетку</button>
+        <button class="docs-btn-outline" @click="goBack">Назад</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRouter, useRoute } from "vue-router";
+import { useEditor, EditorContent } from "@tiptap/vue-3";
+import StarterKit from "@tiptap/starter-kit";
+import TextAlign from "@tiptap/extension-text-align";
+import Underline from "@tiptap/extension-underline";
 import { RouteName } from "../router/keys";
 import { useUserStore } from "../stores/user";
+import { useToast } from "../composables/useToast";
 
 const router = useRouter();
 const route = useRoute();
 const userStore = useUserStore();
+const { show: showToast } = useToast();
+
+// Mode: 'new-story' when storyData is passed, 'add-chapter' when storyId is passed
+const isAddChapterMode = computed(() => !!route.query.storyId && route.query.chapterIndex === undefined);
+const isEditChapterMode = computed(() => !!route.query.storyId && route.query.chapterIndex !== undefined);
+const existingStoryId = computed(() => Number(route.query.storyId) || null);
+const existingChapterIndex = computed(() => route.query.chapterIndex !== undefined ? Number(route.query.chapterIndex) : null);
+const existingStoryTitle = computed(() => (route.query.storyTitle as string) || "");
 
 interface Comment {
+  id: string;
   selectedText: string;
   text: string;
-  position?: number;
 }
 
 const storyData = ref({
@@ -164,616 +196,458 @@ const storyData = ref({
   cover: null as File | null,
 });
 
-const chapterData = ref({
-  title: "Глава 1",
-  content: "",
-});
+const chapterData = ref({ title: "Глава 1", content: "" });
 
-const contentEditable = ref<HTMLElement | null>(null);
-const isCommentMode = ref(false);
-const showCommentPanel = ref(false);
-const newComment = ref("");
-const selectedText = ref("");
 const comments = ref<Comment[]>([]);
+const showCommentInput = ref(false);
+const pendingSelectedText = ref("");
+const pendingCommentText = ref("");
+const hasSelection = ref(false);
+const isCommentMode = ref(false);
+
+const editor = useEditor({
+  extensions: [
+    StarterKit,
+    TextAlign.configure({ types: ["heading", "paragraph"] }),
+    Underline,
+  ],
+  content: "<p></p>",
+  onUpdate({ editor }) {
+    chapterData.value.content = editor.getHTML();
+  },
+  onSelectionUpdate({ editor }) {
+    const { from, to } = editor.state.selection;
+    hasSelection.value = from !== to;
+  },
+});
 
 const wordCount = computed(() => {
-  const text = chapterData.value.content.replace(/<[^>]*>/g, "");
-  return text
-    .trim()
-    .split(/\s+/)
-    .filter(word => word.length > 0)
-    .length;
+  if (!editor.value) return 0;
+  const text = editor.value.getText();
+  return text.trim().split(/\s+/).filter((w) => w.length > 0).length;
 });
+
+const charCount = computed(() => editor.value?.getText().length ?? 0);
 
 const API_BASE = "http://localhost:3000";
 
 onMounted(() => {
-  const storyDataParam = route.query.storyData;
-  if (storyDataParam) {
-    try {
-      storyData.value = JSON.parse(storyDataParam as string);
-    } catch (e) {
-      console.error("Failed to parse story data:", e);
-    }
+  const param = route.query.storyData;
+  if (param) {
+    try { storyData.value = JSON.parse(param as string); } catch (e) { console.error(e); }
+  }
+  if ((isAddChapterMode.value || isEditChapterMode.value) && existingStoryTitle.value) {
+    storyData.value.title = existingStoryTitle.value;
+  }
+  if (isEditChapterMode.value) {
+    const title = route.query.chapterTitle as string || "";
+    const content = route.query.chapterContent as string || "";
+    chapterData.value.title = title;
+    chapterData.value.content = content;
+    editor.value?.commands.setContent(content || "<p></p>");
   }
 });
 
-const updateContent = () => {
-  if (contentEditable.value) {
-    chapterData.value.content = contentEditable.value.innerHTML;
-    console.log("Updated chapter content:", chapterData.value.content);
-  }
+onBeforeUnmount(() => editor.value?.destroy());
+
+const applyHeading = (e: Event) => {
+  const val = (e.target as HTMLSelectElement).value;
+  if (val === "paragraph") editor.value?.chain().focus().setParagraph().run();
+  else editor.value?.chain().focus().toggleHeading({ level: Number(val) as 1 | 2 | 3 }).run();
 };
 
-const handleTextSelection = () => {
+const onEditorMouseUp = () => {
   const selection = window.getSelection();
-  if (selection && selection.toString().length > 0) {
-    selectedText.value = selection.toString();
-    
-    if (isCommentMode.value) {
-      showCommentPanel.value = true;
-    }
-  }
+  hasSelection.value = !!selection && selection.toString().trim().length > 0;
 };
 
-const applyFormat = (format: string) => {
+const openCommentInput = () => {
   const selection = window.getSelection();
-  const isBlockCommand = [
-    "heading",
-    "quote",
-    "code",
-    "unorderedList",
-    "orderedList",
-  ].includes(format);
-
-  if (!selection || (selection.toString().length === 0 && !isBlockCommand)) {
-    alert("Будь ласка, виділіть текст спочатку");
-    return;
-  }
-
-  document.execCommand("styleWithCSS", false, "true");
-
-  switch (format) {
-    case "bold":
-      document.execCommand("bold", false);
-      break;
-    case "italic":
-      document.execCommand("italic", false);
-      break;
-    case "underline":
-      document.execCommand("underline", false);
-      break;
-    case "strikethrough":
-      document.execCommand("strikethrough", false);
-      break;
-    case "heading":
-      document.execCommand("formatBlock", false, "H2");
-      break;
-    case "quote":
-      document.execCommand("formatBlock", false, "BLOCKQUOTE");
-      break;
-    case "code":
-      document.execCommand("formatBlock", false, "PRE");
-      break;
-    case "unorderedList":
-      document.execCommand("insertUnorderedList", false);
-      break;
-    case "orderedList":
-      document.execCommand("insertOrderedList", false);
-      break;
-    default:
-      break;
-  }
-
-  updateContent();
-  contentEditable.value?.focus();
+  if (!selection || selection.toString().trim().length === 0) return;
+  pendingSelectedText.value = selection.toString().trim();
+  pendingCommentText.value = "";
+  showCommentInput.value = true;
+  isCommentMode.value = true;
 };
 
-const applyAlignment = (alignment: string) => {
-  const selection = window.getSelection();
-  if (!selection) return;
-
-  let command = "";
-  switch (alignment) {
-    case "left":
-      command = "justifyLeft";
-      break;
-    case "center":
-      command = "justifyCenter";
-      break;
-    case "right":
-      command = "justifyRight";
-      break;
-  }
-
-  if (command) {
-    document.execCommand(command, false);
-    updateContent();
-    contentEditable.value?.focus();
-  }
-};
-
-const toggleCommentMode = () => {
-  isCommentMode.value = !isCommentMode.value;
-  if (!isCommentMode.value) {
-    showCommentPanel.value = false;
-  }
-};
-
-const addComment = () => {
-  if (!selectedText.value.trim() || !newComment.value.trim()) {
-    alert("Будь ласка, виділіть текст і введіть коментар");
-    return;
-  }
-
-  comments.value.push({
-    selectedText: selectedText.value,
-    text: newComment.value,
-  });
-
+const saveComment = () => {
+  if (!pendingCommentText.value.trim()) return;
+  const comment: Comment = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    selectedText: pendingSelectedText.value,
+    text: pendingCommentText.value.trim(),
+  };
+  comments.value.push(comment);
   cancelComment();
 };
 
 const cancelComment = () => {
-  newComment.value = "";
-  selectedText.value = "";
-  showCommentPanel.value = false;
+  showCommentInput.value = false;
+  isCommentMode.value = false;
+  pendingSelectedText.value = "";
+  pendingCommentText.value = "";
 };
 
-const deleteComment = (index: number) => {
-  comments.value.splice(index, 1);
+const removeComment = (id: string) => {
+  comments.value = comments.value.filter((c) => c.id !== id);
 };
 
 const submitChapter = async () => {
-  if (!chapterData.value.title.trim()) {
-    alert("Будь ласка, введіть назву розділу");
+  if (!chapterData.value.title.trim()) { showToast("Введіть назву розділу", "warning"); return; }
+  if ((editor.value?.getText() ?? "").trim().length < 100) { showToast("Розділ повинен містити щонайменше 100 символів", "warning"); return; }
+  if (!userStore.isAuthorized || !userStore.token) { router.push({ name: RouteName.LOGIN }); return; }
+
+  if (isEditChapterMode.value && existingStoryId.value && existingChapterIndex.value !== null) {
+    // Save edits to existing chapter
+    try {
+      const res = await fetch(`${API_BASE}/stories/${existingStoryId.value}/chapters/${existingChapterIndex.value}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${userStore.token}` },
+        body: JSON.stringify({
+          title: chapterData.value.title,
+          content: chapterData.value.content,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      showToast("Главу збережено!", "success");
+      router.push({ name: RouteName.STORY, params: { id: String(existingStoryId.value) } });
+    } catch (e) {
+      console.error(e);
+      showToast("Помилка при збереженні глави", "error");
+    }
     return;
   }
 
-  if (!chapterData.value.content.trim()) {
-    alert("Будь ласка, введіть текст розділу");
+  if (isAddChapterMode.value && existingStoryId.value) {
+    // Add chapter to existing story
+    try {
+      const res = await fetch(`${API_BASE}/stories/${existingStoryId.value}/chapters`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${userStore.token}` },
+        body: JSON.stringify({
+          title: chapterData.value.title,
+          content: chapterData.value.content,
+          comments: comments.value,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      showToast("Нову главу опубліковано!", "success");
+      router.push({ name: RouteName.STORY, params: { id: String(existingStoryId.value) } });
+    } catch (e) {
+      console.error(e);
+      showToast("Помилка при публікації глави", "error");
+    }
     return;
   }
 
-  const plainText = chapterData.value.content.replace(/<[^>]*>/g, "");
-  if (plainText.length < 100) {
-    alert("Глава должна содержать как минимум 100 символов");
-    return;
-  }
-
+  // Create new story with first chapter
   try {
     const payload = {
-      title: storyData.value.title,
-      description: storyData.value.description,
-      characters: storyData.value.characters,
-      genres: storyData.value.genres,
-      tags: storyData.value.tags,
-      language: storyData.value.language,
-      cover: storyData.value.cover,
+      ...storyData.value,
       chapter: {
         title: chapterData.value.title,
         content: chapterData.value.content,
+        comments: comments.value,
       },
     };
-
-    if (!userStore.isAuthorized || !userStore.token) {
-      alert("Будь ласка, вйдіть в систему, щоб опублікувати історію.");
-      router.push({ name: RouteName.LOGIN });
-      return;
-    }
-
-    const response = await fetch(`${API_BASE}/stories`, {
+    const res = await fetch(`${API_BASE}/stories`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${userStore.token}`,
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${userStore.token}` },
       body: JSON.stringify(payload),
     });
-
-    if (!response.ok) {
-      throw new Error("Failed to publish story");
-    }
-
-    const createdStory = await response.json();
-    alert("История и первая глава успешно опубликованы!");
-    router.push({ name: RouteName.STORY, params: { id: String(createdStory.id) } });
-  } catch (error) {
-    console.error("Error submitting chapter:", error);
-    alert("Ошибка при публикации главы");
+    if (!res.ok) throw new Error("Failed");
+    const created = await res.json();
+    showToast("Історію та перший розділ опубліковано!", "success");
+    router.push({ name: RouteName.STORY, params: { id: String(created.id) } });
+  } catch (e) {
+    console.error(e);
+    showToast("Помилка при публікації", "error");
   }
 };
 
-const saveDraft = async () => {
-  try {
-    console.log("Saving as draft:", {
-      story: storyData.value,
-      chapter: chapterData.value,
-      comments: comments.value,
-    });
-
-    alert("Черновик успешно сохранён!");
-  } catch (error) {
-    console.error("Error saving draft:", error);
-    alert("Ошибка при сохранении черновика");
-  }
+const saveDraft = () => {
+  console.log("Draft:", { story: storyData.value, chapter: chapterData.value, comments: comments.value });
+  showToast("Чернетку збережено!", "info");
 };
 
 const goBack = () => {
-  if (confirm("Вы уверены? Все несохранённые данные будут потеряны.")) {
-    router.push({ name: RouteName.HOME });
-  }
+  if (confirm("Ви впевнені? Всі незбережені дані буде втрачено.")) router.push({ name: RouteName.HOME });
 };
 </script>
 
 <style scoped>
-.write-chapter {
-  min-height: 100vh;
-  padding: 40px 20px;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-}
-
-.chapter-container {
-  max-width: 900px;
-  margin: 0 auto;
-  background: white;
-  padding: 40px;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-}
-
-.chapter-header {
-  text-align: center;
-  margin-bottom: 40px;
-}
-
-.chapter-header h1 {
-  font-size: 2rem;
-  color: #333;
-  margin-bottom: 12px;
-}
-
-.story-title {
-  font-size: 1.2rem;
-  color: #666;
-  font-weight: 500;
-  margin: 0;
-}
-
-.chapter-form {
+.docs-app {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  height: 100vh;
+  background: #f1f3f4;
+  font-family: "Google Sans", Roboto, Arial, sans-serif;
+  overflow: hidden;
 }
 
-.form-group {
+/* === Top bar === */
+.docs-topbar {
   display: flex;
-  flex-direction: column;
-}
-
-.chapter-title-input {
-  padding: 16px;
-  font-size: 1.3rem;
-  font-weight: 600;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  transition: border-color 0.3s ease;
-  font-family: inherit;
-  text-align: center;
-}
-
-.chapter-title-input:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
-}
-
-/* Toolbar */
-.toolbar {
-  display: flex;
-  gap: 12px;
-  padding: 12px;
-  background-color: #f7f8fa;
-  border: 1px solid #dfe1e6;
-  border-radius: 12px;
-  flex-wrap: wrap;
-}
-
-.toolbar-group {
-  display: flex;
-  gap: 4px;
-  padding-right: 12px;
-  border-right: 1px solid #e2e4e8;
-}
-
-.toolbar-group:last-child {
-  border-right: none;
-  padding-right: 0;
-}
-
-.toolbar-btn {
-  padding: 6px 12px;
-  background-color: white;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: all 0.2s ease;
-}
-
-.toolbar-btn:hover {
-  background-color: #e9ecef;
-  border-color: #999;
-}
-
-.toolbar-btn.active {
-  background-color: #007bff;
-  color: white;
-  border-color: #007bff;
-}
-
-/* Editor Container */
-.editor-container {
-  position: relative;
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
-}
-
-.chapter-content-editor {
-  flex: 1;
-  min-width: 0;
-  width: 100%;
-  padding: 20px;
-  font-size: 1.05rem;
-  line-height: 1.8;
-  border: 2px solid #e0e0e0;
-  border-radius: 0 8px 8px 8px;
-  font-family: "Georgia", serif;
-  min-height: 500px;
-  outline: none;
-  transition: border-color 0.3s ease;
-  background-color: white;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  overflow-y: auto;
-}
-
-.chapter-content-editor:focus {
-  border-color: #007bff;
-  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
-}
-
-.chapter-content-editor[contenteditable]:empty:before {
-  content: attr(placeholder);
-  color: #999;
-}
-
-/* Comment Panel */
-.comment-panel {
-  position: absolute;
-  right: 0;
-  top: 0;
-  width: 300px;
-  background: white;
-  border: 2px solid #007bff;
-  border-radius: 8px;
-  padding: 16px;
-  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.2);
-  z-index: 100;
-}
-
-.comment-header {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #eee;
+  justify-content: space-between;
+  background: #fff;
+  padding: 6px 16px 0;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+.docs-topbar-left { display: flex; align-items: flex-start; gap: 12px; }
+.docs-icon { padding-top: 4px; flex-shrink: 0; }
+.docs-title-block { display: flex; flex-direction: column; gap: 1px; padding-bottom: 6px; }
+.docs-title-input {
+  border: none; outline: none; font-size: 18px; color: #202124;
+  padding: 4px 6px; border-radius: 4px; width: 340px; background: transparent; font-family: inherit;
+}
+.docs-title-input:hover { background: #f1f3f4; }
+.docs-title-input:focus { background: #fff; box-shadow: 0 0 0 2px #4285F4; }
+.docs-subtitle { font-size: 12px; color: #9aa0a6; padding-left: 6px; }
+.docs-topbar-right { display: flex; align-items: center; gap: 12px; padding-bottom: 6px; }
+.word-count-badge { font-size: 12px; color: #5f6368; white-space: nowrap; }
+.docs-btn-share {
+  background: #4285F4; color: #fff; border: none; border-radius: 20px;
+  padding: 8px 18px; font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit;
+}
+.docs-btn-share:hover { background: #3367d6; }
+
+/* === Toolbar === */
+.docs-toolbar {
+  display: flex; align-items: center; gap: 2px; background: #fff;
+  border-bottom: 1px solid #e0e0e0; padding: 4px 8px; flex-wrap: wrap; flex-shrink: 0;
+}
+.tb-group { display: flex; align-items: center; gap: 1px; }
+.tb-divider { width: 1px; height: 24px; background: #dadce0; margin: 0 6px; flex-shrink: 0; }
+.tb-btn {
+  display: flex; align-items: center; justify-content: center;
+  min-width: 32px; height: 32px; border: none; background: transparent;
+  border-radius: 4px; cursor: pointer; color: #444; font-size: 15px;
+  padding: 0 6px; transition: background 0.15s; gap: 4px;
+}
+.tb-btn:hover:not(:disabled) { background: #f1f3f4; }
+.tb-btn:disabled { opacity: 0.35; cursor: default; }
+.tb-btn.active { background: #e8f0fe; color: #1a73e8; }
+.tb-fmt { min-width: 28px; }
+.tb-select {
+  border: 1px solid transparent; background: transparent; border-radius: 4px;
+  font-size: 13px; color: #444; padding: 4px 6px; cursor: pointer; height: 32px; font-family: inherit;
+}
+.tb-select:hover { background: #f1f3f4; border-color: #dadce0; }
+.tb-select:focus { outline: none; border-color: #1a73e8; }
+.tb-comment-btn { color: #5f6368; }
+.tb-comment-btn:not(:disabled):hover { background: #fce8b2; color: #b06000; }
+.tb-comment-btn.active { background: #fce8b2; color: #b06000; }
+.tb-comment-label { font-size: 12px; font-weight: 500; }
+
+/* === Main === */
+.docs-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
 }
 
-.comment-header h3 {
-  margin: 0;
-  font-size: 1rem;
-  color: #333;
+/* === Page area === */
+.docs-page-area { flex: 1; overflow-y: auto; padding: 32px 24px; background: #f1f3f4; }
+.docs-page {
+  width: 816px; min-height: 1056px; margin: 0 auto; background: #fff;
+  padding: 96px 96px 128px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2), 0 2px 8px rgba(0,0,0,.1);
+  box-sizing: border-box;
+}
+.docs-editor-content { outline: none; }
+
+:deep(.tiptap) {
+  outline: none; min-height: 600px; font-size: 15px; line-height: 1.8;
+  color: #202124; font-family: "Georgia", serif; caret-color: #1a73e8;
+}
+:deep(.tiptap p) { margin: 0 0 4px 0; }
+:deep(.tiptap h1) { font-size: 26px; font-weight: 400; margin: 24px 0 10px; }
+:deep(.tiptap h2) { font-size: 20px; font-weight: 400; margin: 18px 0 8px; }
+:deep(.tiptap h3) { font-size: 16px; font-weight: 600; margin: 14px 0 6px; }
+:deep(.tiptap blockquote) {
+  border-left: 3px solid #dadce0; margin: 12px 0 12px 16px;
+  padding: 4px 0 4px 16px; color: #5f6368; font-style: italic;
+}
+:deep(.tiptap ul), :deep(.tiptap ol) { padding-left: 28px; margin: 6px 0; }
+:deep(.tiptap li) { margin: 3px 0; }
+
+/* === Sidebar === */
+.docs-sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  background: #f8f9fa;
+  border-left: 1px solid #e0e0e0;
+  overflow-y: auto;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sidebar-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #5f6368;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e0e0e0;
 }
 
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: #999;
-}
-
-.close-btn:hover {
-  color: #333;
-}
-
-.comment-input-group {
+/* New comment input */
+.comment-new {
+  background: #fff;
+  border: 1px solid #fbbc04;
+  border-radius: 8px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  box-shadow: 0 2px 8px rgba(251, 188, 4, 0.15);
 }
-
-.comment-input {
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-family: inherit;
-  resize: vertical;
-  min-height: 80px;
-}
-
-.comment-input:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
-}
-
-/* Comments Section */
-.comments-section {
-  margin-top: 24px;
-  padding: 16px;
-  background-color: #f8f9fa;
-  border-radius: 8px;
-}
-
-.comments-section h3 {
-  margin-top: 0;
-  color: #333;
-  font-size: 1.1rem;
-}
-
-.comment-item {
-  background-color: white;
-  padding: 12px;
-  border-left: 4px solid #007bff;
-  margin-bottom: 12px;
-  border-radius: 4px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.comment-text {
-  flex: 1;
-}
-
-.comment-quote {
+.comment-quote-preview {
+  font-size: 12px;
+  color: #5f6368;
   font-style: italic;
-  color: #666;
-  font-weight: 600;
-}
-
-.comment-item p {
-  margin: 6px 0 0 0;
-  color: #333;
-}
-
-.delete-comment-btn {
-  background-color: #dc3545;
-  color: white;
-  border: none;
-  padding: 4px 12px;
+  background: #fef9e7;
+  padding: 6px 8px;
   border-radius: 4px;
+  border-left: 3px solid #fbbc04;
+  word-break: break-word;
+  max-height: 60px;
+  overflow: hidden;
+}
+.comment-textarea {
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+}
+.comment-textarea:focus { border-color: #1a73e8; }
+.comment-new-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.btn-comment-cancel {
+  background: transparent;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-size: 12px;
   cursor: pointer;
-  font-size: 0.85rem;
-  transition: background-color 0.2s ease;
+  font-family: inherit;
+}
+.btn-comment-cancel:hover { background: #f1f3f4; }
+.btn-comment-save {
+  background: #1a73e8;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btn-comment-save:disabled { opacity: 0.45; cursor: default; }
+.btn-comment-save:not(:disabled):hover { background: #1557b0; }
+
+/* Comment card */
+.comment-card {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.comment-author {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.comment-avatar {
+  width: 24px;
+  height: 24px;
+  background: #1a73e8;
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.comment-author-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: #202124;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.delete-comment-btn:hover {
-  background-color: #c82333;
-}
-
-/* Form Actions */
-.form-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 20px;
-}
-
-.btn {
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
+.comment-delete {
+  background: none;
   border: none;
+  cursor: pointer;
+  color: #9aa0a6;
+  padding: 2px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
 }
-
-.btn-primary {
-  background-color: #007bff;
-  color: white;
-  flex: 2;
+.comment-delete:hover { color: #d93025; background: #fce8e6; }
+.comment-quote {
+  font-size: 12px;
+  color: #5f6368;
+  font-style: italic;
+  background: #f8f9fa;
+  padding: 4px 8px;
+  border-radius: 3px;
+  border-left: 2px solid #dadce0;
+  word-break: break-word;
 }
+.comment-text { font-size: 13px; color: #202124; line-height: 1.5; }
 
-.btn-primary:hover {
-  background-color: #0056b3;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+/* === Bottom bar === */
+.docs-bottombar {
+  display: flex; align-items: center; justify-content: space-between;
+  background: #fff; border-top: 1px solid #e0e0e0; padding: 8px 16px;
+  flex-shrink: 0; font-size: 13px; color: #5f6368;
 }
-
-.btn-secondary {
-  background-color: #6c757d;
-  color: white;
-  flex: 1;
+.docs-bottombar-left { display: flex; align-items: center; gap: 6px; }
+.docs-chapter-mini {
+  border: none; border-bottom: 1px solid transparent; outline: none;
+  font-size: 13px; color: #202124; padding: 2px 4px; font-family: inherit;
+  background: transparent; max-width: 200px;
 }
-
-.btn-secondary:hover {
-  background-color: #5a6268;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+.docs-chapter-mini:focus { border-bottom-color: #1a73e8; }
+.docs-story-name { color: #9aa0a6; }
+.docs-bottombar-right { display: flex; gap: 8px; }
+.docs-btn-secondary {
+  background: #e8f0fe; color: #1a73e8; border: none; border-radius: 4px;
+  padding: 6px 16px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit;
 }
-
-.btn-outline {
-  background-color: transparent;
-  color: #666;
-  border: 2px solid #ddd;
+.docs-btn-secondary:hover { background: #d2e3fc; }
+.docs-btn-outline {
+  background: transparent; color: #444; border: 1px solid #dadce0;
+  border-radius: 4px; padding: 6px 16px; font-size: 13px; cursor: pointer; font-family: inherit;
 }
+.docs-btn-outline:hover { background: #f1f3f4; }
 
-.btn-outline:hover {
-  background-color: #f5f5f5;
-  border-color: #999;
-}
-
-.word-count {
-  text-align: center;
-  color: #999;
-  font-size: 0.9rem;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #eee;
-}
-
-@media (max-width: 768px) {
-  .chapter-container {
-    padding: 20px;
-  }
-
-  .chapter-header h1 {
-    font-size: 1.5rem;
-  }
-
-  .chapter-title-input {
-    font-size: 1.1rem;
-  }
-
-  .chapter-content-editor {
-    min-height: 300px;
-  }
-
-  .editor-container {
-    flex-direction: column;
-  }
-
-  .comment-panel {
-    position: static;
-    width: 100%;
-  }
-
-  .form-actions {
-    flex-wrap: wrap;
-  }
-
-  .btn-primary,
-  .btn-secondary,
-  .btn-outline {
-    flex: 1;
-  }
-
-  .toolbar {
-    gap: 8px;
-  }
-
-  .toolbar-group {
-    gap: 2px;
-    padding-right: 8px;
-  }
+@media (max-width: 900px) {
+  .docs-page { width: 100%; padding: 48px 24px 80px; min-height: unset; box-shadow: none; }
+  .docs-title-input { width: 180px; }
+  .docs-sidebar { width: 240px; }
 }
 </style>

@@ -1,6 +1,13 @@
+export class CreateCommentDto {
+  id: string;
+  selectedText: string;
+  text: string;
+}
+
 export class CreateChapterDto {
   title: string;
   content: string;
+  comments?: CreateCommentDto[];
 }
 
 export class CreateStoryDto {

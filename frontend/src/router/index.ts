@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { RouteName } from "./keys";
+import { useUserStore } from "../stores/user";
 
 const routes = [
   {
@@ -18,6 +19,11 @@ const routes = [
     component: () => import("../views/Story.vue"),
   },
   {
+    path: "/story/:id/chapter/:chapterIndex",
+    name: RouteName.READ_CHAPTER,
+    component: () => import("../views/ReadChapter.vue"),
+  },
+  {
     path: "/profile/:nickname",
     name: RouteName.PROFILE,
     component: () => import("../views/Profile.vue"),
@@ -26,11 +32,13 @@ const routes = [
     path: "/create-story",
     name: RouteName.CREATE_STORY,
     component: () => import("../views/CreateStory.vue"),
+    meta: { requiresAuth: true },
   },
   {
     path: "/write-chapter",
     name: RouteName.WRITE_CHAPTER,
     component: () => import("../views/WriteChapter.vue"),
+    meta: { requiresAuth: true },
   },
   {
     path: "/login",
@@ -47,6 +55,15 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+});
+
+router.beforeEach((to) => {
+  if (to.meta.requiresAuth) {
+    const userStore = useUserStore();
+    if (!userStore.isAuthorized) {
+      return { name: RouteName.LOGIN };
+    }
+  }
 });
 
 export default router;

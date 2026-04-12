@@ -136,8 +136,10 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { RouteName } from "../router/keys";
+import { useToast } from "../composables/useToast";
 
 const router = useRouter();
+const { show: showToast } = useToast();
 const previewImage = ref("");
 
 const availableGenres = [
@@ -205,22 +207,22 @@ const submitStory = async () => {
   updateTags();
   
   if (!formData.value.title.trim()) {
-    alert("Будь ласка, введіть назву");
+    showToast("Будь ласка, введіть назву", "warning");
     return;
   }
 
   if (!formData.value.description.trim()) {
-    alert("Будь ласка, введіть опис");
+    showToast("Будь ласка, введіть опис", "warning");
     return;
   }
 
   if (formData.value.genres.length === 0) {
-    alert("Будь ласка, виберіть принаймні один жанр");
+    showToast("Будь ласка, виберіть принаймні один жанр", "warning");
     return;
   }
 
   if (!formData.value.language) {
-    alert("Будь ласка, виберіть мову");
+    showToast("Будь ласка, виберіть мову", "warning");
     return;
   }
 
@@ -243,7 +245,7 @@ const submitStory = async () => {
     });
   } catch (error) {
     console.error("Error submitting story:", error);
-    alert("Ошибка при переходе к написанию главы");
+    showToast("Ошибка при переходе к написанию главы", "error");
   }
 };
 </script>
