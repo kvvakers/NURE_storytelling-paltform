@@ -76,6 +76,7 @@ import "swiper/css/navigation";
 import { Navigation } from "swiper/modules";
 import SwiperCore from "swiper";
 import { RouteName } from "../router/keys";
+import { api } from '../utils/api';
 SwiperCore.use([Navigation]);
 
 interface Story {
@@ -103,12 +104,7 @@ const newStories = computed(() => {
 
 onMounted(async () => {
   try {
-    const response = await fetch("http://localhost:3000/stories");
-    if (!response.ok) {
-      throw new Error("Backend response not OK");
-    }
-
-    const data = await response.json();
+    const data = await api.get('/stories');
     stories.value = data.map((story: any) => ({
       ...story,
       created_at: story.createdAt,

@@ -10,6 +10,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import Card from "../components/Card.vue";
+import { api } from '../utils/api';
 
 interface Story {
   id: number;
@@ -22,7 +23,7 @@ interface Story {
   genres: string[];
 }
 
-const API_BASE = "http://localhost:3000";
+const API_BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 const route = useRoute();
 const stories = ref<Story[]>([]);
 const isLoading = ref(true);
@@ -40,12 +41,7 @@ const loadStories = async () => {
       url.searchParams.append("query", searchQuery.value);
     }
 
-    const response = await fetch(url.toString());
-    if (!response.ok) {
-      throw new Error("Backend response not OK");
-    }
-
-    const data = await response.json();
+    const data = await api.get(`/stories?${url.searchParams.toString()}`);
     stories.value = data.map((story: any) => ({
       ...story,
       created_at: story.createdAt ?? story.created_at,

@@ -41,7 +41,6 @@
 
 <script setup>
 import { computed } from "vue";
-import { data as allStories } from "../mock/stories";
 import { formatDate } from "../utils/formatDate";
 import { RouteName } from "../router/keys";
 import Card from "../components/Card.vue";
@@ -57,7 +56,7 @@ const user = {
   registered_at: "2023-10-15T12:00:00Z"
 };
 
-const authorStories = computed(() => allStories.slice(0, 5));
+const authorStories = computed(() => [].slice(0, 5));
 
 const route = useRoute();
 console.log(route.params);

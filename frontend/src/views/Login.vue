@@ -26,6 +26,7 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { RouteName } from '../router/keys';
 import { useUserStore } from '../stores/user';
+import { api } from '../utils/api';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -37,22 +38,7 @@ const submitLogin = async () => {
   error.value = '';
 
   try {
-    const response = await fetch('http://localhost:3000/auth/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: email.value,
-        password: password.value,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Невірний email або пароль');
-    }
-
-    const data = await response.json();
+    const data = await api.post('/auth/login', { email: email.value, password: password.value }, { auth: false });
     userStore.setAuth(data.access_token, data.user);
     router.push({ name: RouteName.HOME });
   } catch (err) {

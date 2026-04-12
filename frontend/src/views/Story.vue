@@ -84,9 +84,10 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useUserStore } from "../stores/user";
+// import { useUserStore } from "../stores/user";
 import { useToast } from "../composables/useToast";
 import { RouteName } from "../router/keys";
+import { api } from '../utils/api';
 
 interface Chapter {
   title: string;
@@ -109,7 +110,7 @@ interface Story {
 
 const route = useRoute();
 const router = useRouter();
-const userStore = useUserStore();
+// const userStore = useUserStore();
 const { show: showToast } = useToast();
 
 const deleteModal = ref({ visible: false, chapterIndex: -1, chapterTitle: "" });
@@ -117,20 +118,12 @@ const deleteModal = ref({ visible: false, chapterIndex: -1, chapterTitle: "" });
 const story = ref<Story | null>(null);
 const chapters = ref<Chapter[]>([]);
 
-const API_BASE = "http://localhost:3000";
-
 const loadStory = async () => {
   story.value = null;
   const id = Number(route.params.id);
   if (!id) return;
   try {
-    const headers: Record<string, string> = {};
-    if (userStore.isAuthorized && userStore.token) {
-      headers.Authorization = `Bearer ${userStore.token}`;
-    }
-    const res = await fetch(`${API_BASE}/stories/${id}`, { headers });
-    if (!res.ok) return;
-    const data = await res.json();
+    const data = await api.get(`/stories/${id}`);
     story.value = data;
     chapters.value = data.chapters || [];
   } catch (e) {
@@ -156,21 +149,25 @@ const goToAddChapter = () => {
 
 const editChapter = (idx: number) => {
   if (!story.value) return;
+  const chapter = chapters.value[idx];
+  if (!chapter) return;
   router.push({
     name: RouteName.WRITE_CHAPTER,
     query: {
       storyId: String(story.value.id),
       storyTitle: story.value.title,
       chapterIndex: String(idx),
-      chapterTitle: chapters.value[idx].title,
-      chapterContent: chapters.value[idx].content,
+      chapterTitle: chapter.title,
+      chapterContent: chapter.content,
     },
   });
 };
 
 const confirmDeleteChapter = (idx: number) => {
   if (!story.value) return;
-  deleteModal.value = { visible: true, chapterIndex: idx, chapterTitle: chapters.value[idx].title };
+  const chapter = chapters.value[idx];
+  if (!chapter) return;
+  deleteModal.value = { visible: true, chapterIndex: idx, chapterTitle: chapter.title };
 };
 
 const executeDelete = async () => {
@@ -178,11 +175,7 @@ const executeDelete = async () => {
   deleteModal.value.visible = false;
   if (!story.value || idx < 0) return;
   try {
-    const res = await fetch(`${API_BASE}/stories/${story.value.id}/chapters/${idx}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${userStore.token}` },
-    });
-    if (!res.ok) throw new Error("Failed");
+    await api.del(`/stories/${story.value.id}/chapters/${idx}`);
     chapters.value.splice(idx, 1);
     showToast("Главу видалено", "success");
   } catch (e) {

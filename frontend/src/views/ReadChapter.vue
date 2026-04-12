@@ -135,6 +135,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useUserStore } from "../stores/user";
 import { useToast } from "../composables/useToast";
 import { RouteName } from "../router/keys";
+import { api } from '../utils/api';
 
 interface Reply {
   id?: string;
@@ -183,8 +184,6 @@ const expandedReplyIndex = ref(-1);
 const replyText = ref("");
 const chapterTextRef = ref<HTMLElement | null>(null);
 
-const API_BASE = "http://localhost:3000";
-
 const loadChapter = async () => {
   chapter.value = null;
   try {
@@ -192,9 +191,7 @@ const loadChapter = async () => {
     if (userStore.isAuthorized && userStore.token) {
       headers.Authorization = `Bearer ${userStore.token}`;
     }
-    const res = await fetch(`${API_BASE}/stories/${storyId.value}`, { headers });
-    if (!res.ok) return;
-    const data = await res.json();
+    const data = await api.get(`/stories/${storyId.value}`);
     totalChapters.value = (data.chapters || []).length;
     chapter.value = data.chapters?.[chapterIndex.value] ?? null;
     expandedReplyIndex.value = -1;
@@ -214,11 +211,8 @@ const navigateTo = (idx: number) => {
 
 const loadComments = async () => {
   try {
-    const res = await fetch(`${API_BASE}/stories/${storyId.value}/chapters/${chapterIndex.value}/comments`);
-    if (res.ok) {
-      const data = await res.json();
-      comments.value = Array.isArray(data) ? data : [];
-    }
+    const data = await api.get(`/stories/${storyId.value}/chapters/${chapterIndex.value}/comments`);
+    comments.value = Array.isArray(data) ? data : [];
   } catch (e) {
     console.error(e);
   }
@@ -264,18 +258,7 @@ const submitComment = async () => {
     return;
   }
   try {
-    const res = await fetch(
-      `${API_BASE}/stories/${storyId.value}/chapters/${chapterIndex.value}/comments`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${userStore.token}`,
-        },
-        body: JSON.stringify({ selectedText: selectedText.value, text: newCommentText.value }),
-      },
-    );
-    if (!res.ok) throw new Error("Failed");
+    await api.post(`/stories/${storyId.value}/chapters/${chapterIndex.value}/comments`, { selectedText: selectedText.value, text: newCommentText.value });
     await loadComments();
     closeCommentPanel();
     showToast("Коментар додано!", "success");
@@ -302,18 +285,7 @@ const submitReply = async (commentIndex: number) => {
     return;
   }
   try {
-    const res = await fetch(
-      `http://localhost:3000/stories/${storyId.value}/chapters/${chapterIndex.value}/comments/${comment.id}/replies`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${userStore.token}`,
-        },
-        body: JSON.stringify({ text: replyText.value }),
-      }
-    );
-    if (!res.ok) throw new Error("Помилка при збереженні відповіді");
+    await api.post(`/stories/${storyId.value}/chapters/${chapterIndex.value}/comments/${comment.id}/replies`, { text: replyText.value });
     toggleReply(-1);
     await loadComments();
     showToast("Відповідь додано!", "success");

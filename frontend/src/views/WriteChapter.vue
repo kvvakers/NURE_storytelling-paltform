@@ -167,6 +167,7 @@ import Underline from "@tiptap/extension-underline";
 import { RouteName } from "../router/keys";
 import { useUserStore } from "../stores/user";
 import { useToast } from "../composables/useToast";
+import { api } from '../utils/api';
 
 const router = useRouter();
 const route = useRoute();
@@ -228,8 +229,6 @@ const wordCount = computed(() => {
 });
 
 const charCount = computed(() => editor.value?.getText().length ?? 0);
-
-const API_BASE = "http://localhost:3000";
 
 onMounted(() => {
   const param = route.query.storyData;
@@ -300,15 +299,10 @@ const submitChapter = async () => {
   if (isEditChapterMode.value && existingStoryId.value && existingChapterIndex.value !== null) {
     // Save edits to existing chapter
     try {
-      const res = await fetch(`${API_BASE}/stories/${existingStoryId.value}/chapters/${existingChapterIndex.value}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${userStore.token}` },
-        body: JSON.stringify({
-          title: chapterData.value.title,
-          content: chapterData.value.content,
-        }),
+      await api.patch(`/stories/${existingStoryId.value}/chapters/${existingChapterIndex.value}`, {
+        title: chapterData.value.title,
+        content: chapterData.value.content,
       });
-      if (!res.ok) throw new Error("Failed");
       showToast("Главу збережено!", "success");
       router.push({ name: RouteName.STORY, params: { id: String(existingStoryId.value) } });
     } catch (e) {
@@ -321,16 +315,11 @@ const submitChapter = async () => {
   if (isAddChapterMode.value && existingStoryId.value) {
     // Add chapter to existing story
     try {
-      const res = await fetch(`${API_BASE}/stories/${existingStoryId.value}/chapters`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${userStore.token}` },
-        body: JSON.stringify({
-          title: chapterData.value.title,
-          content: chapterData.value.content,
-          comments: comments.value,
-        }),
+      await api.post(`/stories/${existingStoryId.value}/chapters`, {
+        title: chapterData.value.title,
+        content: chapterData.value.content,
+        comments: comments.value,
       });
-      if (!res.ok) throw new Error("Failed");
       showToast("Нову главу опубліковано!", "success");
       router.push({ name: RouteName.STORY, params: { id: String(existingStoryId.value) } });
     } catch (e) {
@@ -350,13 +339,7 @@ const submitChapter = async () => {
         comments: comments.value,
       },
     };
-    const res = await fetch(`${API_BASE}/stories`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${userStore.token}` },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error("Failed");
-    const created = await res.json();
+    const created = await api.post(`/stories`, payload);
     showToast("Історію та перший розділ опубліковано!", "success");
     router.push({ name: RouteName.STORY, params: { id: String(created.id) } });
   } catch (e) {
