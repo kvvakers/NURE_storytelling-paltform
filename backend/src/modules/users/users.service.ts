@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../../models/entities/postgres/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class UsersService {
@@ -42,5 +43,33 @@ export class UsersService {
     return this.userRepository.findOne({
       where: { id },
     });
+  }
+
+  async getProfile(id: number) {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+    const { password, ...profile } = user;
+    return profile;
+  }
+
+  async updateProfile(id: number, dto: UpdateProfileDto) {
+    const user = await this.userRepository.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+
+    if (dto.username !== undefined) {
+      const existing = await this.userRepository.findOne({
+        where: { username: dto.username },
+      });
+      if (existing && existing.id !== id) {
+        throw new ConflictException('Username already taken');
+      }
+      user.username = dto.username;
+    }
+    if (dto.bio !== undefined) user.bio = dto.bio;
+    if (dto.avatar !== undefined) user.avatar = dto.avatar;
+
+    await this.userRepository.save(user);
+    const { password, ...profile } = user;
+    return profile;
   }
 }

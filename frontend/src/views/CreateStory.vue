@@ -8,11 +8,14 @@
         <div class="form-group">
           <label for="cover">Обкладинка</label>
           <div class="image-upload">
-            <div v-if="previewImage" class="image-preview">
-              <img :src="previewImage" :alt="formData.title || 'Preview'" />
-              <button type="button" @click="removeCover" class="btn-remove">✕</button>
+            <div v-if="isUploadingCover" class="upload-placeholder _flex _flex-col _ai-c _jc-c">
+              <p>Завантаження...</p>
             </div>
-            <div v-else class="upload-placeholder">
+            <div v-else-if="previewImage" class="image-preview">
+              <img :src="previewImage" :alt="formData.title || 'Preview'" />
+              <button type="button" @click="removeCover" class="btn-remove _flex _ai-c _jc-c">✕</button>
+            </div>
+            <div v-else class="upload-placeholder _flex _flex-col _ai-c _jc-c">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="17 8 12 3 7 8"></polyline>
@@ -72,7 +75,7 @@
         <div class="form-group">
           <label>Категорія (жанр)</label>
           <div class="checkbox-group">
-            <label v-for="genre in availableGenres" :key="genre" class="checkbox-label">
+            <label v-for="genre in availableGenres" :key="genre" class="checkbox-label _flex _ai-c">
               <input
                 type="checkbox"
                 :value="genre"
@@ -94,7 +97,7 @@
             placeholder="Теги через кому (наприклад: фантастика, пригода, любов)"
             class="input"
           />
-          <div class="tags-preview">
+          <div class="tags-preview _flex _flex-wrap _gap-8">
             <span v-for="tag in parsedTags" :key="tag" class="tag">
               {{ tag }}
               <button
@@ -121,9 +124,9 @@
         </div>
 
         <!-- Submit Button -->
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary btn-lg">Опубликовать историю</button>
-          <router-link :to="{ name: RouteName.HOME }" class="btn btn-secondary btn-lg">
+        <div class="form-actions _flex _gap-12">
+          <button type="submit" class="btn btn-primary btn-lg _flex-1">Опубликовать историю</button>
+          <router-link :to="{ name: RouteName.HOME }" class="btn btn-secondary btn-lg _flex-1 _jc-c">
             Отмена
           </router-link>
         </div>
@@ -137,6 +140,8 @@ import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { RouteName } from "../router/keys";
 import { useToast } from "../composables/useToast";
+import { api } from "../utils/api";
+import { resolveMedia } from "../utils/resolveMedia";
 
 const router = useRouter();
 const { show: showToast } = useToast();
@@ -167,18 +172,30 @@ const formData = ref({
 
 const parsedTags = ref<string[]>([]);
 
-const handleImageUpload = (event: Event) => {
+const isUploadingCover = ref(false);
+
+const handleImageUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
-  
-  if (file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string;
-      previewImage.value = dataUrl;
-      formData.value.cover = dataUrl;
-    };
-    reader.readAsDataURL(file);
+  if (!file) return;
+
+  // Show local preview immediately
+  previewImage.value = URL.createObjectURL(file);
+
+  // Upload to server
+  isUploadingCover.value = true;
+  try {
+    const formData2 = new FormData();
+    formData2.append('cover', file);
+    const res = await api.post('/stories/upload-cover', formData2);
+    formData.value.cover = res.url;
+    previewImage.value = resolveMedia(res.url);
+  } catch (e) {
+    showToast('Помилка завантаження обкладинки', 'error');
+    previewImage.value = '';
+    formData.value.cover = '';
+  } finally {
+    isUploadingCover.value = false;
   }
 };
 
@@ -334,28 +351,21 @@ h1 {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background-color: #dc3545;
+  background-color: var(--color-danger);
   color: white;
   border: none;
   cursor: pointer;
   font-size: 1.2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   transition: background-color 0.3s ease;
 }
 
 .btn-remove:hover {
-  background-color: #c82333;
+  background-color: var(--color-danger-hover);
 }
 
 .upload-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   padding: 40px;
-  border: 2px dashed #ddd;
+  border: 2px dashed var(--color-border);
   border-radius: 8px;
   background-color: #f9f9f9;
   transition: all 0.3s ease;
@@ -398,8 +408,6 @@ h1 {
 }
 
 .checkbox-label {
-  display: flex;
-  align-items: center;
   cursor: pointer;
   padding: 8px;
   border-radius: 6px;
@@ -424,9 +432,6 @@ h1 {
 
 /* Tags */
 .tags-preview {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
   margin-top: 12px;
 }
 
@@ -458,24 +463,7 @@ h1 {
 
 /* Form Actions */
 .form-actions {
-  display: flex;
-  gap: 12px;
   margin-top: 32px;
-}
-
-.btn-lg {
-  flex: 1;
-  padding: 12px 24px;
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.btn-secondary {
-  text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-decoration: none;
 }
 
 @media (max-width: 768px) {

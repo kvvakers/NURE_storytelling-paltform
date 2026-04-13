@@ -1,7 +1,7 @@
 <template>
-    <div class="default-layout">
+    <div class="default-layout _flex _flex-col _flex-full">
         <DefaultHeader />
-        <main class="main-content">
+        <main class="main-content _flex-full _flex _flex-col">
             <slot />
         </main>
     </div>
@@ -12,15 +12,4 @@ import DefaultHeader from '../components/DefaultHeader.vue'
 </script>
 
 <style scoped>
-.default-layout {
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-}
-
-.main-content {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-}
 </style>

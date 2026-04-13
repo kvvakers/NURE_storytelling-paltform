@@ -24,7 +24,13 @@ const routes = [
     component: () => import("../views/ReadChapter.vue"),
   },
   {
-    path: "/profile/:nickname",
+    path: "/profile",
+    name: RouteName.MY_PROFILE,
+    component: () => import("../views/Profile.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/profile/:id",
     name: RouteName.PROFILE,
     component: () => import("../views/Profile.vue"),
   },

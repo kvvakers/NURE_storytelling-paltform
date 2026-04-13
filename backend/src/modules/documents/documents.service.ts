@@ -12,6 +12,7 @@ import {
   CreateCommentDto,
   CreateChapterDto,
 } from './dto/create-story.dto';
+import { UpdateStoryDto } from './dto/update-story.dto';
 import { DocumentMeta } from '../../models/entities/postgres/document-meta.entity';
 import { User } from '../../models/entities/postgres/user.entity';
 import {
@@ -38,10 +39,16 @@ export class DocumentsService {
   ) {}
 
   async createStory(createStoryDto: CreateStoryDto, ownerId?: number) {
+    let authorName = 'Anonymous Author';
+    if (ownerId) {
+      const owner = await this.userRepository.findOne({ where: { id: ownerId } });
+      if (owner) authorName = owner.username || owner.email;
+    }
+
     const meta = this.documentMetaRepository.create({
       title: createStoryDto.title,
       description: createStoryDto.description,
-      author: 'Anonymous Author',
+      author: authorName,
       characters: createStoryDto.characters,
       genres: createStoryDto.genres,
       tags: createStoryDto.tags,
@@ -96,20 +103,52 @@ export class DocumentsService {
       const normalizedQuery = `%${searchQuery.toLowerCase()}%`;
       metas = await this.documentMetaRepository
         .createQueryBuilder('meta')
-        .where('LOWER(meta.title) LIKE :query', {
-          query: normalizedQuery,
-        })
-        .orWhere('LOWER(meta.description) LIKE :query', {
-          query: normalizedQuery,
-        })
-        .orWhere('LOWER(meta.author) LIKE :query', {
-          query: normalizedQuery,
-        })
+        .where('LOWER(meta.title) LIKE :query', { query: normalizedQuery })
+        .orWhere('LOWER(meta.description) LIKE :query', { query: normalizedQuery })
+        .orWhere('LOWER(meta.author) LIKE :query', { query: normalizedQuery })
         .orderBy('meta.createdAt', 'DESC')
         .getMany();
     }
 
+    // Batch-fetch owners to get up-to-date usernames
+    const ownerIds = [...new Set(metas.map((m) => m.ownerId).filter((id): id is number => id != null))];
+    const ownerMap = new Map<number, string>();
+    if (ownerIds.length > 0) {
+      const users = await this.userRepository.findByIds(ownerIds);
+      for (const u of users) ownerMap.set(u.id, u.username || u.email);
+    }
+
     return metas.map((meta) => ({
+      id: meta.id,
+      title: meta.title,
+      description: meta.description,
+      author: meta.ownerId ? (ownerMap.get(meta.ownerId) ?? meta.author) : meta.author,
+      characters: meta.characters,
+      genres: meta.genres,
+      tags: meta.tags,
+      language: meta.language,
+      cover: meta.cover,
+      rating: meta.rating,
+      ownerId: meta.ownerId,
+      createdAt: meta.createdAt.toISOString(),
+    }));
+  }
+
+  async updateStory(id: number, dto: UpdateStoryDto, userId: number) {
+    const meta = await this.documentMetaRepository.findOne({ where: { id } });
+    if (!meta) throw new NotFoundException(`Story with id ${id} not found`);
+    if (meta.ownerId !== userId) throw new ForbiddenException('Not allowed');
+
+    if (dto.title !== undefined) meta.title = dto.title;
+    if (dto.description !== undefined) meta.description = dto.description;
+    if (dto.characters !== undefined) meta.characters = dto.characters;
+    if (dto.genres !== undefined) meta.genres = dto.genres;
+    if (dto.tags !== undefined) meta.tags = dto.tags;
+    if (dto.language !== undefined) meta.language = dto.language;
+    if (dto.cover !== undefined) meta.cover = dto.cover;
+
+    await this.documentMetaRepository.save(meta);
+    return {
       id: meta.id,
       title: meta.title,
       description: meta.description,
@@ -120,8 +159,19 @@ export class DocumentsService {
       language: meta.language,
       cover: meta.cover,
       rating: meta.rating,
+      ownerId: meta.ownerId,
       createdAt: meta.createdAt.toISOString(),
-    }));
+    };
+  }
+
+  async deleteStory(id: number, userId: number) {
+    const meta = await this.documentMetaRepository.findOne({ where: { id } });
+    if (!meta) throw new NotFoundException(`Story with id ${id} not found`);
+    if (meta.ownerId !== userId) throw new ForbiddenException('Not allowed');
+
+    await this.documentMetaRepository.remove(meta);
+    await this.documentContentModel.deleteOne({ documentId: id });
+    return { deleted: id };
   }
 
   async updateChapter(
@@ -175,22 +225,22 @@ export class DocumentsService {
   }
 
   async getStoryById(id: number, userId?: number) {
-    const meta = await this.documentMetaRepository.findOne({
-      where: { id },
-    });
-    if (!meta) {
-      throw new NotFoundException(`Story with id ${id} not found`);
-    }
+    const meta = await this.documentMetaRepository.findOne({ where: { id } });
+    if (!meta) throw new NotFoundException(`Story with id ${id} not found`);
 
-    const content = await this.documentContentModel.findOne({
-      documentId: id,
-    });
+    const content = await this.documentContentModel.findOne({ documentId: id });
+
+    let authorName = meta.author;
+    if (meta.ownerId) {
+      const owner = await this.userRepository.findOne({ where: { id: meta.ownerId } });
+      if (owner) authorName = owner.username || owner.email;
+    }
 
     return {
       id: meta.id,
       title: meta.title,
       description: meta.description,
-      author: meta.author,
+      author: authorName,
       characters: meta.characters,
       genres: meta.genres,
       tags: meta.tags,
@@ -274,7 +324,7 @@ export class DocumentsService {
     const userMap = new Map<number, string>();
     if (authorIds.size > 0) {
       const users = await this.userRepository.findByIds([...authorIds]);
-      for (const u of users) userMap.set(u.id, u.email);
+      for (const u of users) userMap.set(u.id, u.username || u.email);
     }
 
     return comments.map((c) => ({

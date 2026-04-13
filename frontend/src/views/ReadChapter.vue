@@ -2,11 +2,11 @@
   <div v-if="chapter" class="read-page">
     <div class="_container">
       <!-- Header -->
-      <div class="read-header">
+      <div class="read-header _flex _ai-c _jc-sb _flex-wrap _gap-12">
         <button class="btn btn-secondary back-btn" @click="router.push({ name: RouteName.STORY, params: { id: storyId } })">
           ← Назад до історії
         </button>
-        <div class="read-nav">
+        <div class="read-nav _flex _ai-c _gap-16">
           <button
             class="btn btn-secondary"
             :disabled="chapterIndex <= 0"
@@ -41,14 +41,13 @@
           class="comment-tooltip"
           :style="tooltipPosition"
         >
-          <button @click="openCommentPanel" class="comment-tooltip-btn">
-            🗣 Додати коментар
-          </button>
+          <button @click="openCommentPanel" class="btn btn-primary">
+            🗣 Додати коментар</button>
         </div>
 
         <!-- Comment Input Panel -->
         <div v-if="showCommentPanel" class="comment-input-panel">
-          <div class="comment-panel-header">
+          <div class="comment-panel-header _flex _ai-c _jc-sb">
             <h3>Додати коментар</h3>
             <button type="button" @click="closeCommentPanel" class="close-btn">×</button>
           </div>
@@ -61,7 +60,7 @@
             placeholder="Напишіть ваш коментар..."
             class="comment-textarea"
           ></textarea>
-          <div class="comment-panel-actions">
+          <div class="comment-panel-actions _flex _gap-12">
             <button @click="submitComment" class="btn btn-primary">Опублікувати</button>
             <button @click="closeCommentPanel" class="btn btn-secondary">Скасувати</button>
           </div>
@@ -77,7 +76,7 @@
           </div>
           <div class="comment-content">
             <p class="comment-text">{{ comment.text }}</p>
-            <div class="comment-meta">
+            <div class="comment-meta _flex _gap-12">
               <span class="comment-author">{{ comment.authorName || comment.author || ('Читач #' + (comment.authorId ?? '?')) }}</span>
               <span class="comment-date">{{ formatDate(comment.createdAt || comment.date || '') }}</span>
             </div>
@@ -85,18 +84,18 @@
           <div v-if="comment.replies && comment.replies.length > 0" class="replies">
             <div v-for="(reply, ri) in comment.replies" :key="ri" class="reply">
               <p class="reply-text">{{ reply.text }}</p>
-              <div class="reply-meta">
+              <div class="reply-meta _flex _gap-12">
                 <span class="reply-author">{{ reply.authorName || reply.author || (reply.authorId ? 'Читач #' + reply.authorId : 'Анонімний') }}</span>
                 <span class="reply-date">{{ formatDate(reply.createdAt || reply.date) }}</span>
               </div>
             </div>
           </div>
-          <button @click="toggleReply(idx)" class="reply-btn">
+          <button @click="toggleReply(idx)" class="btn btn-primary btn-sm">
             {{ expandedReplyIndex === idx ? 'Сховати' : 'Відповісти' }}
           </button>
           <div v-if="expandedReplyIndex === idx" class="reply-input-section">
             <textarea v-model="replyText" placeholder="Ваша відповідь..." class="reply-textarea"></textarea>
-            <div class="reply-actions">
+            <div class="reply-actions _flex _gap-8">
               <button @click="submitReply(idx)" class="btn btn-primary">Надіслати</button>
               <button @click="toggleReply(-1)" class="btn btn-secondary">Скасувати</button>
             </div>
@@ -105,7 +104,7 @@
       </div>
 
       <!-- Bottom navigation -->
-      <div class="read-footer">
+      <div class="read-footer _flex _jc-sb">
         <button
           class="btn btn-secondary"
           :disabled="chapterIndex <= 0"
@@ -321,18 +320,7 @@ const formatDate = (date: string | Date | undefined) => {
 }
 
 .read-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   margin-bottom: 32px;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.read-nav {
-  display: flex;
-  align-items: center;
-  gap: 16px;
 }
 
 .chapter-counter {
@@ -349,7 +337,7 @@ const formatDate = (date: string | Date | undefined) => {
   background: white;
   border-radius: 12px;
   padding: 48px 56px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-sm);
   margin-bottom: 32px;
   position: relative;
 }
@@ -377,47 +365,32 @@ const formatDate = (date: string | Date | undefined) => {
 .comment-tooltip {
   position: absolute;
   background: white;
-  border: 2px solid #007bff;
+  border: 2px solid var(--color-primary);
   border-radius: 8px;
   padding: 8px;
-  box-shadow: 0 4px 12px rgba(0,123,255,0.2);
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.2);
   z-index: 100;
 }
-.comment-tooltip-btn {
-  background: #007bff;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-.comment-tooltip-btn:hover { background: #0056b3; }
 
 /* Comment Input Panel */
 .comment-input-panel {
   background: #f8f9fa;
-  border: 2px solid #007bff;
+  border: 2px solid var(--color-primary);
   border-radius: 12px;
   padding: 20px;
   margin-top: 24px;
 }
-.comment-panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
+.comment-panel-header { margin-bottom: 16px; }
 .comment-panel-header h3 { margin: 0; color: #333; }
 .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; }
 .close-btn:hover { color: #333; }
 .comment-quote-preview { background: white; padding: 12px; border-radius: 8px; margin-bottom: 16px; }
 .comment-quote-preview p:first-child { margin: 0 0 8px; font-weight: 600; font-size: 0.9rem; color: #555; }
-.quote { margin: 0; font-style: italic; color: #007bff; }
+.quote { margin: 0; font-style: italic; color: var(--color-primary); }
 .comment-textarea {
   width: 100%;
   padding: 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   font-size: 1rem;
   font-family: inherit;
@@ -426,51 +399,40 @@ const formatDate = (date: string | Date | undefined) => {
   margin-bottom: 12px;
   box-sizing: border-box;
 }
-.comment-textarea:focus { outline: none; border-color: #007bff; box-shadow: 0 0 0 3px rgba(0,123,255,0.1); }
-.comment-panel-actions { display: flex; gap: 12px; }
+.comment-textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1); }
 
 /* Comments section */
 .comments-section {
   background: white;
   border-radius: 12px;
   padding: 32px 40px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-sm);
   margin-bottom: 32px;
 }
 .comments-section h3 { margin: 0 0 24px; color: #333; }
 .comment-block {
   background: #f8f9fa;
-  border-left: 4px solid #007bff;
+  border-left: 4px solid var(--color-primary);
   padding: 16px;
   margin-bottom: 20px;
   border-radius: 8px;
 }
 .comment-quote-section { background: white; padding: 12px; border-radius: 6px; margin-bottom: 12px; }
-.comment-quote { margin: 0; font-style: italic; color: #007bff; font-weight: 500; }
+.comment-quote { margin: 0; font-style: italic; color: var(--color-primary); font-weight: 500; }
 .comment-content { margin-bottom: 12px; }
 .comment-text { margin: 0 0 8px; color: #333; line-height: 1.6; }
-.comment-meta { display: flex; gap: 12px; font-size: 0.85rem; color: #999; }
+.comment-meta { font-size: 0.85rem; color: #999; }
 .comment-author { font-weight: 600; color: #666; }
-.reply-btn {
-  background: #007bff;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-.reply-btn:hover { background: #0056b3; }
-.replies { margin-top: 12px; padding-left: 20px; border-left: 2px solid #ddd; }
+.replies { margin-top: 12px; padding-left: 20px; border-left: 2px solid var(--color-border); }
 .reply { background: white; padding: 12px; border-radius: 6px; margin-bottom: 8px; }
 .reply-text { margin: 0 0 6px; color: #333; }
-.reply-meta { display: flex; gap: 12px; font-size: 0.85rem; color: #999; }
+.reply-meta { font-size: 0.85rem; color: #999; }
 .reply-author { font-weight: 600; color: #666; }
 .reply-input-section { margin-top: 12px; padding: 12px; background: white; border-radius: 6px; }
 .reply-textarea {
   width: 100%;
   padding: 10px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   font-size: 0.95rem;
   font-family: inherit;
@@ -479,20 +441,10 @@ const formatDate = (date: string | Date | undefined) => {
   margin-bottom: 8px;
   box-sizing: border-box;
 }
-.reply-textarea:focus { outline: none; border-color: #007bff; box-shadow: 0 0 0 3px rgba(0,123,255,0.1); }
-.reply-actions { display: flex; gap: 8px; }
+.reply-textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1); }
 
 /* Footer nav */
 .read-footer {
-  display: flex;
-  justify-content: space-between;
   padding-bottom: 40px;
 }
-
-.btn { padding: 8px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem; transition: all 0.2s; }
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-primary { background: #007bff; color: white; }
-.btn-primary:not(:disabled):hover { background: #0056b3; }
-.btn-secondary { background: transparent; color: #333; border: 1px solid #ddd; }
-.btn-secondary:not(:disabled):hover { background: #f0f0f0; }
 </style>

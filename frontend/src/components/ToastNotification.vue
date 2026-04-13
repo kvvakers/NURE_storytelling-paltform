@@ -1,17 +1,17 @@
 <template>
   <teleport to="body">
-    <div class="toast-container">
+    <div class="toast-container _flex _flex-col _gap-10">
       <transition-group name="toast">
         <div
           v-for="toast in toasts"
           :key="toast.id"
-          class="toast"
+          class="toast _flex _ai-c _gap-10"
           :class="`toast--${toast.type}`"
           @click="remove(toast.id)"
         >
-          <span class="toast__icon">{{ icons[toast.type] }}</span>
-          <span class="toast__message">{{ toast.message }}</span>
-          <button class="toast__close" @click.stop="remove(toast.id)">✕</button>
+          <span class="toast__icon _shrink-0">{{ icons[toast.type] }}</span>
+          <span class="toast__message _flex-1">{{ toast.message }}</span>
+          <button class="toast__close _shrink-0" @click.stop="remove(toast.id)">✕</button>
         </div>
       </transition-group>
     </div>
@@ -37,16 +37,10 @@ const icons: Record<string, string> = {
   bottom: 24px;
   right: 24px;
   z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
   pointer-events: none;
 }
 
 .toast {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   min-width: 280px;
   max-width: 420px;
   padding: 14px 16px;
@@ -65,11 +59,6 @@ const icons: Record<string, string> = {
 
 .toast__icon {
   font-size: 1.1rem;
-  flex-shrink: 0;
-}
-
-.toast__message {
-  flex: 1;
 }
 
 .toast__close {
@@ -81,7 +70,6 @@ const icons: Record<string, string> = {
   opacity: 0.8;
   padding: 0;
   line-height: 1;
-  flex-shrink: 0;
 }
 
 .toast__close:hover {

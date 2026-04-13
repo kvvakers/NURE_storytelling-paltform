@@ -1,23 +1,23 @@
 ﻿<template>
-  <div class="docs-app">
+  <div class="docs-app _flex _flex-col">
     <!-- Top bar -->
-    <div class="docs-topbar">
-      <div class="docs-topbar-left">
-        <div class="docs-title-block">
+    <div class="docs-topbar _flex _ai-c _jc-sb">
+      <div class="docs-topbar-left _flex _ai-fs _gap-12">
+        <div class="docs-title-block _flex _flex-col">
           <input v-model="chapterData.title" type="text" class="docs-title-input" placeholder="Назва розділу" />
           <div class="docs-subtitle">{{ isAddChapterMode ? existingStoryTitle : storyData.title }}</div>
         </div>
       </div>
-      <div class="docs-topbar-right">
+      <div class="docs-topbar-right _flex _ai-c _gap-12">
         <div class="word-count-badge">Слів: {{ wordCount }} | Символів: {{ charCount }}</div>
         <button class="docs-btn-share" @click="submitChapter">{{ isEditChapterMode ? 'Зберегти зміни' : 'Опублікувати' }}</button>
       </div>
     </div>
 
     <!-- Toolbar -->
-    <div class="docs-toolbar" v-if="editor">
+    <div class="docs-toolbar _flex _ai-c _flex-wrap _shrink-0" v-if="editor">
       <!-- Undo / Redo -->
-      <div class="tb-group">
+      <div class="tb-group _flex _ai-c">
         <button class="tb-btn" @click="editor.chain().focus().undo().run()" title="Скасувати (Ctrl+Z)" :disabled="!editor.can().undo()">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>
         </button>
@@ -25,10 +25,10 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 14 20 9 15 4"/><path d="M4 20v-7a4 4 0 0 1 4-4h12"/></svg>
         </button>
       </div>
-      <div class="tb-divider"></div>
+      <div class="tb-divider _shrink-0"></div>
 
       <!-- Text style -->
-      <div class="tb-group">
+      <div class="tb-group _flex _ai-c">
         <select class="tb-select" @change="applyHeading($event)" title="Стиль тексту">
           <option value="paragraph">Текст</option>
           <option value="1">Заголовок 1</option>
@@ -36,19 +36,19 @@
           <option value="3">Заголовок 3</option>
         </select>
       </div>
-      <div class="tb-divider"></div>
+      <div class="tb-divider _shrink-0"></div>
 
       <!-- Formatting -->
-      <div class="tb-group">
+      <div class="tb-group _flex _ai-c">
         <button class="tb-btn tb-fmt" :class="{ active: editor.isActive('bold') }" @click="editor.chain().focus().toggleBold().run()" title="Жирний (Ctrl+B)"><strong>B</strong></button>
         <button class="tb-btn tb-fmt" :class="{ active: editor.isActive('italic') }" @click="editor.chain().focus().toggleItalic().run()" title="Курсив (Ctrl+I)"><em>I</em></button>
         <button class="tb-btn tb-fmt" :class="{ active: editor.isActive('underline') }" @click="editor.chain().focus().toggleUnderline().run()" title="Підкреслення (Ctrl+U)"><u>U</u></button>
         <button class="tb-btn tb-fmt" :class="{ active: editor.isActive('strike') }" @click="editor.chain().focus().toggleStrike().run()" title="Закреслення"><s>S</s></button>
       </div>
-      <div class="tb-divider"></div>
+      <div class="tb-divider _shrink-0"></div>
 
       <!-- Alignment -->
-      <div class="tb-group">
+      <div class="tb-group _flex _ai-c">
         <button class="tb-btn" :class="{ active: editor.isActive({ textAlign: 'left' }) }" @click="editor.chain().focus().setTextAlign('left').run()" title="Ліворуч">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h18v2H3zm0 4h12v2H3zm0 4h18v2H3zm0 4h12v2H3zm0 4h18v2H3z"/></svg>
         </button>
@@ -62,10 +62,10 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h18v2H3zm0 4h18v2H3zm0 4h18v2H3zm0 4h18v2H3zm0 4h18v2H3z"/></svg>
         </button>
       </div>
-      <div class="tb-divider"></div>
+      <div class="tb-divider _shrink-0"></div>
 
       <!-- Lists & quote -->
-      <div class="tb-group">
+      <div class="tb-group _flex _ai-c">
         <button class="tb-btn" :class="{ active: editor.isActive('bulletList') }" @click="editor.chain().focus().toggleBulletList().run()" title="Маркований список">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="4" cy="6" r="1.5"/><rect x="8" y="5" width="13" height="2"/><circle cx="4" cy="12" r="1.5"/><rect x="8" y="11" width="13" height="2"/><circle cx="4" cy="18" r="1.5"/><rect x="8" y="17" width="13" height="2"/></svg>
         </button>
@@ -76,10 +76,10 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M6 17h3l2-4V7H5v6h3zm8 0h3l2-4V7h-6v6h3z"/></svg>
         </button>
       </div>
-      <div class="tb-divider"></div>
+      <div class="tb-divider _shrink-0"></div>
 
       <!-- Comment button -->
-      <div class="tb-group">
+      <div class="tb-group _flex _ai-c">
         <button
           class="tb-btn tb-comment-btn"
           :class="{ active: isCommentMode, disabled: !hasSelection }"
@@ -96,23 +96,23 @@
     </div>
 
     <!-- Main content area -->
-    <div class="docs-main">
+    <div class="docs-main _flex _flex-1">
       <!-- Page -->
-      <div class="docs-page-area">
+      <div class="docs-page-area _flex-1">
         <div class="docs-page">
           <editor-content :editor="editor" class="docs-editor-content" @mouseup="onEditorMouseUp" />
         </div>
       </div>
 
       <!-- Comments sidebar -->
-      <div class="docs-sidebar" v-if="comments.length > 0 || showCommentInput">
-        <div class="sidebar-title">
+      <div class="docs-sidebar _flex _flex-col _gap-12 _shrink-0" v-if="comments.length > 0 || showCommentInput">
+        <div class="sidebar-title _flex _ai-c _gap-6">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           Коментарі
         </div>
 
         <!-- New comment input -->
-        <div v-if="showCommentInput" class="comment-new">
+        <div v-if="showCommentInput" class="comment-new _flex _flex-col _gap-8">
           <div class="comment-quote-preview">«{{ pendingSelectedText }}»</div>
           <textarea
             v-model="pendingCommentText"
@@ -121,18 +121,18 @@
             rows="3"
             autofocus
           ></textarea>
-          <div class="comment-new-actions">
+          <div class="comment-new-actions _flex _gap-8 _jc-fe">
             <button class="btn-comment-cancel" @click="cancelComment">Скасувати</button>
             <button class="btn-comment-save" @click="saveComment" :disabled="!pendingCommentText.trim()">Зберегти</button>
           </div>
         </div>
 
         <!-- Comment list -->
-        <div v-for="comment in comments" :key="comment.id" class="comment-card">
-          <div class="comment-author">
-            <div class="comment-avatar">{{ userStore.user?.nickname?.[0]?.toUpperCase() || 'A' }}</div>
-            <span class="comment-author-name">{{ userStore.user?.nickname || userStore.user?.email }}</span>
-            <button class="comment-delete" @click="removeComment(comment.id)" title="Видалити">
+        <div v-for="comment in comments" :key="comment.id" class="comment-card _flex _flex-col _gap-6">
+          <div class="comment-author _flex _ai-c _gap-8">
+            <div class="comment-avatar _flex _ai-c _jc-c _shrink-0">{{ userStore.user?.nickname?.[0]?.toUpperCase() || 'A' }}</div>
+            <span class="comment-author-name _flex-1">{{ userStore.user?.nickname || userStore.user?.email }}</span>
+            <button class="comment-delete _flex _ai-c" @click="removeComment(comment.id)" title="Видалити">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
@@ -143,13 +143,13 @@
     </div>
 
     <!-- Bottom bar -->
-    <div class="docs-bottombar">
-      <div class="docs-bottombar-left">
+    <div class="docs-bottombar _flex _ai-c _jc-sb">
+      <div class="docs-bottombar-left _flex _ai-c _gap-6">
         <span>Глава:</span>
         <input v-model="chapterData.title" class="docs-chapter-mini" placeholder="Назва розділу" />
         <span class="docs-story-name" v-if="storyData.title || isAddChapterMode">— {{ isAddChapterMode ? existingStoryTitle : storyData.title }}</span>
       </div>
-      <div class="docs-bottombar-right">
+      <div class="docs-bottombar-right _flex _gap-8">
         <button class="docs-btn-secondary" @click="saveDraft">Зберегти чернетку</button>
         <button class="docs-btn-outline" @click="goBack">Назад</button>
       </div>
@@ -360,8 +360,6 @@ const goBack = () => {
 
 <style scoped>
 .docs-app {
-  display: flex;
-  flex-direction: column;
   height: 100vh;
   background: #f1f3f4;
   font-family: "Google Sans", Roboto, Arial, sans-serif;
@@ -370,17 +368,13 @@ const goBack = () => {
 
 /* === Top bar === */
 .docs-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   background: #fff;
   padding: 6px 16px 0;
   border-bottom: 1px solid #e0e0e0;
   flex-shrink: 0;
 }
-.docs-topbar-left { display: flex; align-items: flex-start; gap: 12px; }
-.docs-icon { padding-top: 4px; flex-shrink: 0; }
-.docs-title-block { display: flex; flex-direction: column; gap: 1px; padding-bottom: 6px; }
+.docs-icon { padding-top: 4px; }
+.docs-title-block { padding-bottom: 6px; }
 .docs-title-input {
   border: none; outline: none; font-size: 18px; color: #202124;
   padding: 4px 6px; border-radius: 4px; width: 340px; background: transparent; font-family: inherit;
@@ -388,7 +382,7 @@ const goBack = () => {
 .docs-title-input:hover { background: #f1f3f4; }
 .docs-title-input:focus { background: #fff; box-shadow: 0 0 0 2px #4285F4; }
 .docs-subtitle { font-size: 12px; color: #9aa0a6; padding-left: 6px; }
-.docs-topbar-right { display: flex; align-items: center; gap: 12px; padding-bottom: 6px; }
+.docs-topbar-right { padding-bottom: 6px; }
 .word-count-badge { font-size: 12px; color: #5f6368; white-space: nowrap; }
 .docs-btn-share {
   background: #4285F4; color: #fff; border: none; border-radius: 20px;
@@ -398,11 +392,11 @@ const goBack = () => {
 
 /* === Toolbar === */
 .docs-toolbar {
-  display: flex; align-items: center; gap: 2px; background: #fff;
-  border-bottom: 1px solid #e0e0e0; padding: 4px 8px; flex-wrap: wrap; flex-shrink: 0;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 4px 8px;
 }
-.tb-group { display: flex; align-items: center; gap: 1px; }
-.tb-divider { width: 1px; height: 24px; background: #dadce0; margin: 0 6px; flex-shrink: 0; }
+.tb-divider { width: 1px; height: 24px; background: #dadce0; margin: 0 6px; }
 .tb-btn {
   display: flex; align-items: center; justify-content: center;
   min-width: 32px; height: 32px; border: none; background: transparent;
@@ -426,13 +420,11 @@ const goBack = () => {
 
 /* === Main === */
 .docs-main {
-  display: flex;
-  flex: 1;
   overflow: hidden;
 }
 
 /* === Page area === */
-.docs-page-area { flex: 1; overflow-y: auto; padding: 32px 24px; background: #f1f3f4; }
+.docs-page-area { overflow-y: auto; padding: 32px 24px; background: #f1f3f4; }
 .docs-page {
   width: 816px; min-height: 1056px; margin: 0 auto; background: #fff;
   padding: 96px 96px 128px;
@@ -459,19 +451,12 @@ const goBack = () => {
 /* === Sidebar === */
 .docs-sidebar {
   width: 300px;
-  flex-shrink: 0;
   background: #f8f9fa;
   border-left: 1px solid #e0e0e0;
   overflow-y: auto;
   padding: 16px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 .sidebar-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   font-size: 13px;
   font-weight: 600;
   color: #5f6368;
@@ -487,9 +472,6 @@ const goBack = () => {
   border: 1px solid #fbbc04;
   border-radius: 8px;
   padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
   box-shadow: 0 2px 8px rgba(251, 188, 4, 0.15);
 }
 .comment-quote-preview {
@@ -514,11 +496,6 @@ const goBack = () => {
   outline: none;
 }
 .comment-textarea:focus { border-color: #1a73e8; }
-.comment-new-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
 .btn-comment-cancel {
   background: transparent;
   border: 1px solid #dadce0;
@@ -548,14 +525,6 @@ const goBack = () => {
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.comment-author {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 .comment-avatar {
   width: 24px;
@@ -563,15 +532,10 @@ const goBack = () => {
   background: #1a73e8;
   color: #fff;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   font-size: 11px;
   font-weight: 700;
-  flex-shrink: 0;
 }
 .comment-author-name {
-  flex: 1;
   font-size: 12px;
   font-weight: 600;
   color: #202124;
@@ -586,8 +550,6 @@ const goBack = () => {
   color: #9aa0a6;
   padding: 2px;
   border-radius: 3px;
-  display: flex;
-  align-items: center;
 }
 .comment-delete:hover { color: #d93025; background: #fce8e6; }
 .comment-quote {
@@ -604,11 +566,9 @@ const goBack = () => {
 
 /* === Bottom bar === */
 .docs-bottombar {
-  display: flex; align-items: center; justify-content: space-between;
   background: #fff; border-top: 1px solid #e0e0e0; padding: 8px 16px;
   flex-shrink: 0; font-size: 13px; color: #5f6368;
 }
-.docs-bottombar-left { display: flex; align-items: center; gap: 6px; }
 .docs-chapter-mini {
   border: none; border-bottom: 1px solid transparent; outline: none;
   font-size: 13px; color: #202124; padding: 2px 4px; font-family: inherit;
@@ -616,7 +576,6 @@ const goBack = () => {
 }
 .docs-chapter-mini:focus { border-bottom-color: #1a73e8; }
 .docs-story-name { color: #9aa0a6; }
-.docs-bottombar-right { display: flex; gap: 8px; }
 .docs-btn-secondary {
   background: #e8f0fe; color: #1a73e8; border: none; border-radius: 4px;
   padding: 6px 16px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit;

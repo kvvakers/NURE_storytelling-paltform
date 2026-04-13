@@ -4,7 +4,7 @@
       <!-- Story Metadata -->
       <div class="story-metadata _flex _gap-x-32">
         <div>
-          <img :src="story.cover" :alt="story.title" class="cover" />
+          <img :src="resolveMedia(story.cover)" :alt="story.title" class="cover" />
         </div>
         <div class="story-info">
           <h1 class="_h1">{{ story.title }}</h1>
@@ -12,15 +12,19 @@
           <p><b>Опис:</b> {{ story.description }}</p>
           <p><b>Рейтинг:</b> {{ story.rating }}/10</p>
           <p><b>Дата публікації:</b> {{ new Date(story.createdAt).toLocaleDateString('uk-UA') }}</p>
-          <div class="genres">
+          <div class="genres _flex _flex-wrap _gap-8">
             <span v-for="g in story.genres" :key="g" class="genre">{{ g }}</span>
+          </div>
+          <div v-if="story.isMine" class="story-owner-actions _flex _gap-12">
+            <button class="btn btn-secondary" @click="openEditStory">✏️ Редагувати</button>
+            <button class="btn btn-danger" @click="deleteStoryModal = true">🗑 Видалити</button>
           </div>
         </div>
       </div>
 
       <!-- Chapters list -->
       <div class="chapters-section">
-        <div class="chapters-header">
+        <div class="chapters-header _flex _ai-c _jc-sb">
           <h2>Глави ({{ chapters.length }})</h2>
           <button v-if="story.isMine" type="button" class="btn btn-primary" @click="goToAddChapter">
             + Додати главу
@@ -31,14 +35,14 @@
           Глав ще немає.
         </div>
 
-        <div v-else class="chapter-list">
+        <div v-else class="chapter-list _flex _flex-col _gap-12">
           <div v-for="(ch, idx) in chapters" :key="idx" class="chapter-card">
-            <div class="chapter-card-main" @click="goToRead(idx)">
+            <div class="chapter-card-main _flex _flex-col _gap-4" @click="goToRead(idx)">
               <span class="chapter-number">Глава {{ idx + 1 }}</span>
               <span class="chapter-title">{{ ch.title }}</span>
               <span class="chapter-preview">{{ stripHtml(ch.content).slice(0, 120) }}{{ ch.content.length > 120 ? '…' : '' }}</span>
             </div>
-            <div v-if="story.isMine" class="chapter-card-actions">
+            <div v-if="story.isMine" class="chapter-card-actions _flex _gap-8 _shrink-0">
               <button
                 type="button"
                 class="btn btn-secondary btn-sm"
@@ -66,7 +70,90 @@
     <p>Історія не знайдена</p>
   </div>
 
-  <!-- Confirm Delete Modal -->
+  <!-- Confirm Delete Story Modal -->
+  <teleport to="body">
+    <div v-if="deleteStoryModal" class="modal-overlay" @click.self="deleteStoryModal = false">
+      <div class="modal">
+        <h3 class="modal-title">Видалити історію?</h3>
+        <p class="modal-text">«{{ story?.title }}» буде видалено безповоротно разом з усіма главами.</p>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" @click="deleteStoryModal = false">Скасувати</button>
+          <button class="btn btn-danger" @click="executeDeleteStory">Видалити</button>
+        </div>
+      </div>
+    </div>
+  </teleport>
+
+  <!-- Edit Story Modal -->
+  <teleport to="body">
+    <div v-if="editStoryModal" class="modal-overlay" @click.self="editStoryModal = false">
+      <div class="modal modal-wide">
+        <h3 class="modal-title">Редагувати історію</h3>
+
+        <div class="edit-form _flex _flex-col _gap-14">
+          <!-- Cover -->
+          <div class="form-group">
+            <label>Обкладинка</label>
+            <div class="avatar-upload">
+              <img v-if="editStory.coverPreview || editStory.cover" :src="editStory.coverPreview || resolveMedia(editStory.cover)" class="cover-preview" />
+              <label class="avatar-upload-btn">
+                Вибрати файл
+                <input type="file" accept="image/*" class="avatar-file-input" @change="onEditCoverChange" :disabled="editStory.isUploadingCover" />
+              </label>
+              <span v-if="editStory.isUploadingCover" style="font-size:13px;color:#888">Завантаження...</span>
+            </div>
+          </div>
+          <!-- Title -->
+          <div class="form-group">
+            <label>Назва</label>
+            <input v-model="editStory.title" type="text" class="form-input" />
+          </div>
+          <!-- Description -->
+          <div class="form-group">
+            <label>Опис</label>
+            <textarea v-model="editStory.description" class="form-input form-textarea"></textarea>
+          </div>
+          <!-- Characters -->
+          <div class="form-group">
+            <label>Персонажі</label>
+            <input v-model="editStory.characters" type="text" class="form-input" />
+          </div>
+          <!-- Genres -->
+          <div class="form-group">
+            <label>Жанри (через кому)</label>
+            <input v-model="editStory.genresRaw" type="text" class="form-input" />
+          </div>
+          <!-- Tags -->
+          <div class="form-group">
+            <label>Теги (через кому)</label>
+            <input v-model="editStory.tagsRaw" type="text" class="form-input" />
+          </div>
+          <!-- Language -->
+          <div class="form-group">
+            <label>Мова</label>
+            <select v-model="editStory.language" class="form-input">
+              <option value="uk">Українська</option>
+              <option value="ru">Русский</option>
+              <option value="en">English</option>
+              <option value="de">Deutsch</option>
+              <option value="fr">Français</option>
+              <option value="es">Español</option>
+            </select>
+          </div>
+        </div>
+
+        <div v-if="editStory.error" class="error-state">{{ editStory.error }}</div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" @click="editStoryModal = false" :disabled="editStory.isSaving">Скасувати</button>
+          <button class="btn btn-primary" @click="saveEditStory" :disabled="editStory.isSaving || editStory.isUploadingCover">
+            {{ editStory.isSaving ? 'Збереження...' : 'Зберегти' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </teleport>
+
+  <!-- Confirm Delete Chapter Modal -->
   <teleport to="body">
     <div v-if="deleteModal.visible" class="modal-overlay" @click.self="deleteModal.visible = false">
       <div class="modal">
@@ -88,6 +175,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useToast } from "../composables/useToast";
 import { RouteName } from "../router/keys";
 import { api } from '../utils/api';
+import { resolveMedia } from '../utils/resolveMedia';
 
 interface Chapter {
   title: string;
@@ -114,6 +202,22 @@ const router = useRouter();
 const { show: showToast } = useToast();
 
 const deleteModal = ref({ visible: false, chapterIndex: -1, chapterTitle: "" });
+const deleteStoryModal = ref(false);
+
+const editStoryModal = ref(false);
+const editStory = ref({
+  title: '',
+  description: '',
+  characters: '',
+  genresRaw: '',
+  tagsRaw: '',
+  language: '',
+  cover: '',
+  coverPreview: '',
+  isUploadingCover: false,
+  isSaving: false,
+  error: '',
+});
 
 const story = ref<Story | null>(null);
 const chapters = ref<Chapter[]>([]);
@@ -133,6 +237,77 @@ const loadStory = async () => {
 
 onMounted(loadStory);
 watch(() => route.params.id, loadStory);
+
+const executeDeleteStory = async () => {
+  if (!story.value) return;
+  deleteStoryModal.value = false;
+  try {
+    await api.del(`/stories/${story.value.id}`);
+    showToast('Історію видалено', 'success');
+    router.push({ name: RouteName.HOME });
+  } catch (e) {
+    console.error(e);
+    showToast('Помилка при видаленні', 'error');
+  }
+};
+
+const openEditStory = () => {
+  if (!story.value) return;
+  editStory.value.title = story.value.title;
+  editStory.value.description = story.value.description;
+  editStory.value.characters = (story.value as any).characters || '';
+  editStory.value.genresRaw = (story.value.genres || []).join(', ');
+  editStory.value.tagsRaw = ((story.value as any).tags || []).join(', ');
+  editStory.value.language = (story.value as any).language || '';
+  editStory.value.cover = story.value.cover;
+  editStory.value.coverPreview = '';
+  editStory.value.error = '';
+  editStoryModal.value = true;
+};
+
+const onEditCoverChange = async (e: Event) => {
+  const file = (e.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  editStory.value.coverPreview = URL.createObjectURL(file);
+  editStory.value.isUploadingCover = true;
+  try {
+    const fd = new FormData();
+    fd.append('cover', file);
+    const res = await api.post('/stories/upload-cover', fd);
+    editStory.value.cover = res.url;
+    editStory.value.coverPreview = (await import('../utils/resolveMedia')).resolveMedia(res.url);
+  } catch {
+    showToast('Помилка завантаження обкладинки', 'error');
+    editStory.value.coverPreview = '';
+  } finally {
+    editStory.value.isUploadingCover = false;
+  }
+};
+
+const saveEditStory = async () => {
+  if (!story.value) return;
+  editStory.value.isSaving = true;
+  editStory.value.error = '';
+  try {
+    const payload: Record<string, any> = {
+      title: editStory.value.title,
+      description: editStory.value.description,
+      characters: editStory.value.characters,
+      genres: editStory.value.genresRaw.split(',').map(s => s.trim()).filter(Boolean),
+      tags: editStory.value.tagsRaw.split(',').map(s => s.trim()).filter(Boolean),
+      language: editStory.value.language,
+      cover: editStory.value.cover,
+    };
+    const updated = await api.patch(`/stories/${story.value.id}`, payload);
+    Object.assign(story.value, updated);
+    editStoryModal.value = false;
+    showToast('Історію збережено', 'success');
+  } catch (e: any) {
+    editStory.value.error = e?.data?.message || e?.message || 'Помилка збереження';
+  } finally {
+    editStory.value.isSaving = false;
+  }
+};
 
 const goToRead = (idx: number) => {
   if (!story.value) return;
@@ -205,13 +380,12 @@ const stripHtml = (html: string) => {
   color: #666;
 }
 
-/* Metadata */
 .story-metadata {
   background: white;
   padding: 40px;
   border-radius: 12px;
   margin-bottom: 40px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-sm);
 }
 
 .cover {
@@ -219,36 +393,28 @@ const stripHtml = (html: string) => {
   height: 400px;
   object-fit: cover;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .story-info { flex: 1; }
 .story-info h1 { margin: 0 0 20px; color: #333; }
 .story-info p { margin: 8px 0; color: #555; }
 
-.genres { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-.genre { padding: 6px 12px; background: #e7f3ff; color: #007bff; border-radius: 20px; font-size: 0.9rem; }
+.genres { margin-top: 16px; }
+.genre { padding: 6px 12px; background: #e7f3ff; color: var(--color-primary); border-radius: 20px; font-size: 0.9rem; }
 
-/* Chapters section */
 .chapters-section {
   background: white;
   border-radius: 12px;
   padding: 32px 40px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-sm);
 }
 
 .chapters-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   margin-bottom: 24px;
 }
 
-.chapters-header h2 {
-  margin: 0;
-  font-size: 1.4rem;
-  color: #333;
-}
+.chapters-header h2 { margin: 0; font-size: 1.4rem; color: #333; }
 
 .no-chapters {
   color: #999;
@@ -257,32 +423,19 @@ const stripHtml = (html: string) => {
   font-size: 1rem;
 }
 
-.chapter-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
 .chapter-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   border: 1px solid #e8e8e8;
   border-radius: 10px;
   padding: 18px 20px;
   transition: box-shadow 0.2s, border-color 0.2s;
-  gap: 16px;
 }
 
 .chapter-card:hover {
-  box-shadow: 0 4px 14px rgba(0,0,0,0.1);
-  border-color: #007bff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+  border-color: var(--color-primary);
 }
 
 .chapter-card-main {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
   cursor: pointer;
   flex: 1;
   min-width: 0;
@@ -291,16 +444,12 @@ const stripHtml = (html: string) => {
 .chapter-number {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #007bff;
+  color: var(--color-primary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.chapter-title {
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: #222;
-}
+.chapter-title { font-size: 1.05rem; font-weight: 600; color: #222; }
 
 .chapter-preview {
   font-size: 0.9rem;
@@ -310,35 +459,26 @@ const stripHtml = (html: string) => {
   text-overflow: ellipsis;
 }
 
-.chapter-card-actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
+.story-owner-actions { margin-top: 20px; }
+
+.modal-wide { max-width: 560px; width: 100%; }
+
+.edit-form {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-bottom: 16px;
 }
 
-/* Buttons */
-.btn {
-  padding: 8px 18px;
-  border: none;
+.edit-form-group label { font-size: 13px; font-weight: 600; color: #444; }
+
+.cover-preview {
+  width: 80px;
+  height: 112px;
+  object-fit: cover;
   border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: all 0.2s;
+  border: 1px solid var(--color-border);
 }
-
-.btn-sm {
-  padding: 6px 12px;
-  font-size: 0.82rem;
-}
-
-.btn-primary { background: #007bff; color: white; }
-.btn-primary:hover { background: #0056b3; }
-
-.btn-secondary { background: transparent; color: #333; border: 1px solid #ddd; }
-.btn-secondary:hover { background: #f0f0f0; }
-
-.btn-danger { background: transparent; color: #dc3545; border: 1px solid #dc3545; }
-.btn-danger:hover { background: #dc3545; color: white; }
 
 @media (max-width: 768px) {
   .story-metadata { flex-direction: column; padding: 20px; }
@@ -346,44 +486,5 @@ const stripHtml = (html: string) => {
   .chapters-section { padding: 20px; }
   .chapter-card { flex-direction: column; align-items: flex-start; }
   .chapter-card-actions { width: 100%; justify-content: flex-end; }
-}
-
-/* Confirm Modal */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9998;
-}
-
-.modal {
-  background: white;
-  border-radius: 12px;
-  padding: 32px 36px;
-  min-width: 320px;
-  max-width: 440px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-}
-
-.modal-title {
-  margin: 0 0 12px;
-  font-size: 1.2rem;
-  color: #222;
-}
-
-.modal-text {
-  margin: 0 0 24px;
-  color: #555;
-  font-size: 0.95rem;
-  line-height: 1.5;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
 }
 </style>

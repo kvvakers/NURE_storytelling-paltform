@@ -1,9 +1,12 @@
 import { defineStore } from 'pinia';
 
+const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+
 interface User {
   id: number;
   email: string;
-  nickname?: string;
+  username?: string;
+  avatar?: string;
 }
 
 interface UserState {
@@ -26,19 +29,39 @@ export const useUserStore = defineStore('user', {
     },
   },
   actions: {
-    loadAuth() {
+    async loadAuth() {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) {
-        return;
-      }
+      if (!saved) return;
 
       try {
         const parsed = JSON.parse(saved) as { token: string; user: User };
         this.token = parsed.token;
         this.user = parsed.user;
         this._isAuthorized = Boolean(parsed.token && parsed.user);
-      } catch (error) {
+
+        // Перевіряємо токен і оновлюємо дані з сервера
+        await this.refreshUser();
+      } catch {
         localStorage.removeItem(STORAGE_KEY);
+      }
+    },
+    async refreshUser() {
+      if (!this.token) return;
+      try {
+        const res = await fetch(`${API_BASE}/users/me`, {
+          headers: { Authorization: `Bearer ${this.token}` },
+        });
+        if (res.status === 401) {
+          this.logout();
+          return;
+        }
+        if (res.ok) {
+          const data: User = await res.json();
+          this.user = data;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: this.token, user: data }));
+        }
+      } catch {
+        // сеть недоступна — оставляем кешированные данные
       }
     },
     setAuth(token: string, user: User) {

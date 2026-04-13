@@ -26,9 +26,9 @@
           class="stories-swiper swiper-fade"
         >
           <swiper-slide v-for="story in popularStoriesRef" :key="story.id">
-            <div class="story-card">
+            <div class="story-card _flex _flex-col">
               <RouterLink :to="{name: RouteName.STORY, params: {id: story.id}}">
-                <img :src="story.cover" alt="cover" />
+                <img :src="resolveMedia(story.cover) || 'src/assets/placeholder.jpg'" alt="cover" />
                 <div class="story-card-info">
                   <h3>{{ story.title }}</h3>
                   <p>{{ story.author || 'Автор не вказаний' }}</p>
@@ -50,9 +50,9 @@
           class="stories-swiper swiper-fade"
         >
           <swiper-slide v-for="story in newStories" :key="story.id">
-            <div class="story-card">
+            <div class="story-card _flex _flex-col">
               <RouterLink :to="{name: RouteName.STORY, params: {id: story.id}}">
-                <img :src="story.cover" alt="cover" />
+                <img :src="resolveMedia(story.cover) || 'src/assets/placeholder.jpg'" alt="cover" />
                 <div class="story-card-info">
                   <h3>{{ story.title }}</h3>
                   <p>{{ story.author || 'Автор не вказаний' }}</p>
@@ -77,6 +77,7 @@ import { Navigation } from "swiper/modules";
 import SwiperCore from "swiper";
 import { RouteName } from "../router/keys";
 import { api } from '../utils/api';
+import { resolveMedia } from '../utils/resolveMedia';
 SwiperCore.use([Navigation]);
 
 interface Story {
@@ -133,13 +134,6 @@ onMounted(async () => {
 
 .hero-buttons button {
   margin: 0 10px;
-  padding: 10px 18px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.secondary {
-  background: #e5e7eb;
 }
 
 .section {
@@ -150,51 +144,26 @@ onMounted(async () => {
   margin-bottom: 15px;
 }
 
-.stories-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 20px;
-}
-
 .story-card {
   background: white;
   border-radius: 12px;
   padding: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-sm);
 }
 
 .story-card img {
   width: 100%;
+  height: 180px;
+  object-fit: cover;
   border-radius: 8px;
   margin-bottom: 10px;
+  flex-shrink: 0;
 }
 
-.story-card-info {
-  padding: 10px 0;
-}
+.story-card-info { padding: 10px 0; }
+.story-card-info h3 { margin: 0 0 6px; font-size: 1rem; color: #111; }
+.story-card-info p { margin: 2px 0; color: #666; font-size: 0.9rem; }
 
-.story-card-info h3 {
-  margin: 0 0 6px;
-  font-size: 1rem;
-  color: #111;
-}
-
-.story-card-info p {
-  margin: 2px 0;
-  color: #666;
-  font-size: 0.9rem;
-}
-
-.loading-state,
-.error-state {
-  padding: 16px 0;
-  font-size: 1rem;
-  text-align: center;
-}
-
-.error-state {
-  color: #b91c1c;
-}
 .swiper-fade {
   position: relative;
 }

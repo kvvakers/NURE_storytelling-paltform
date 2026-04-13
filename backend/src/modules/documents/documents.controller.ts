@@ -9,10 +9,16 @@ import {
   Post,
   Query,
   Request,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { extname, join } from 'path';
+import { mkdirSync, writeFileSync } from 'fs';
 import { CreateStoryDto, CreateCommentDto, CreateChapterDto } from './dto/create-story.dto';
 import { UpdateChapterDto } from './dto/update-chapter.dto';
+import { UpdateStoryDto } from './dto/update-story.dto';
 import { DocumentsService } from './documents.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
@@ -20,6 +26,25 @@ import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 @Controller('stories')
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
+
+  @UseGuards(JwtAuthGuard)
+  @Post('upload-cover')
+  @UseInterceptors(
+    FileInterceptor('cover', {
+      limits: { fileSize: 10 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        const allowed = /\.(jpg|jpeg|png|gif|webp)$/i;
+        cb(null, allowed.test(file.originalname));
+      },
+    }),
+  )
+  uploadCover(@UploadedFile() file: any) {
+    const coversDir = join(process.cwd(), 'uploads', 'covers');
+    mkdirSync(coversDir, { recursive: true });
+    const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extname(file.originalname)}`;
+    writeFileSync(join(coversDir, filename), file.buffer as Buffer);
+    return { url: `/uploads/covers/${filename}` };
+  }
 
   @UseGuards(JwtAuthGuard)
   @Post()
@@ -37,6 +62,25 @@ export class DocumentsController {
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     return this.documentsService.getStoryById(id, req.user?.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id')
+  updateStory(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateStoryDto,
+    @Request() req: any,
+  ) {
+    return this.documentsService.updateStory(id, dto, req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id')
+  deleteStory(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ) {
+    return this.documentsService.deleteStory(id, req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)

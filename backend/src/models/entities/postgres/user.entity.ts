@@ -16,6 +16,15 @@ export class User {
   @Column()
   password: string;
 
+  @Column({ nullable: true, unique: true })
+  username: string;
+
+  @Column({ nullable: true, type: 'text' })
+  bio: string;
+
+  @Column({ nullable: true })
+  avatar: string;
+
   @CreateDateColumn()
   createdAt: Date;
 }
