@@ -130,8 +130,8 @@
         <!-- Comment list -->
         <div v-for="comment in comments" :key="comment.id" class="comment-card _flex _flex-col _gap-6">
           <div class="comment-author _flex _ai-c _gap-8">
-            <div class="comment-avatar _flex _ai-c _jc-c _shrink-0">{{ userStore.user?.nickname?.[0]?.toUpperCase() || 'A' }}</div>
-            <span class="comment-author-name _flex-1">{{ userStore.user?.nickname || userStore.user?.email }}</span>
+            <div class="comment-avatar _flex _ai-c _jc-c _shrink-0">{{ userStore.user?.username?.[0]?.toUpperCase() || 'A' }}</div>
+            <span class="comment-author-name _flex-1">{{ userStore.user?.username || userStore.user?.email }}</span>
             <button class="comment-delete _flex _ai-c" @click="removeComment(comment.id)" title="Видалити">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
