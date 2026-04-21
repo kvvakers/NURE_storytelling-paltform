@@ -7,26 +7,30 @@
           <span class="logo-text">Storytelling</span>
         </RouterLink>
 
-        <div class="search-bar _flex _ai-c _flex-full">
+        <div class="search-bar _flex _ai-c _flex-full _gap-8">
+          <Search :size="18" class="search-icon" />
           <input
             v-model="searchQuery"
             @keyup.enter="search"
             type="text"
             placeholder="Пошук історій..."
-            class="search-input"
+            class="search-input _flex-1"
           />
         </div>
       </div>
 
       <div v-if="userStore.isAuthorized" class="actions _flex _gap-8 _shrink-0">
-        <button class="btn btn-secondary" @click="handleWrite">Написати</button>
-        <button class="btn btn-secondary" @click="showLogoutModal = true">Вихід</button>
-        <RouterLink :to="{ name: RouteName.MY_PROFILE }" class="profile _flex _ai-c">
-          
-        <RouterLink :to="{ name: RouteName.NOTIFICATIONS }" class="notif-bell" title="Сповіщення">
-          <span class="bell-icon">🔔</span>
-          <span v-if="unreadCount > 0" class="badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+        <button class="btn btn-secondary _flex _ai-c _gap-6" @click="handleWrite">
+          <PenLine :size="16" />Написати
+        </button>
+        <button class="btn btn-secondary _flex _ai-c _gap-6" @click="showLogoutModal = true">
+          <LogOut :size="16" />Вихід
+        </button>
+        <RouterLink :to="{ name: RouteName.NOTIFICATIONS }" class="notif-btn btn btn-secondary _flex _ai-c _jc-c" title="Сповіщення">
+          <Bell :size="18" />
+          <span v-if="unreadCount > 0" class="badge _flex _ai-c _jc-c">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
         </RouterLink>
+        <RouterLink :to="{ name: RouteName.MY_PROFILE }" class="profile _flex _ai-c">
           <div class="profile-img">
             <img :src="resolveMedia(userStore.user?.avatar)" alt="Avatar">
           </div>
@@ -35,9 +39,15 @@
       </div>
 
       <div v-else class="actions _flex _gap-8 _shrink-0">
-        <button class="btn btn-primary" @click="handleWrite">Написати</button>
-        <button class="btn btn-secondary" @click="handleLogin">Вхід</button>
-        <button class="btn btn-signup" @click="handleSignUp">Реєстрація</button>
+        <button class="btn btn-primary _flex _ai-c _gap-6" @click="handleWrite">
+          <PenLine :size="16" />Написати
+        </button>
+        <button class="btn btn-secondary _flex _ai-c _gap-6" @click="handleLogin">
+          <LogIn :size="16" />Вхід
+        </button>
+        <button class="btn btn-signup _flex _ai-c _gap-6" @click="handleSignUp">
+          <UserPlus :size="16" />Реєстрація
+        </button>
       </div>
     </div>
   </header>
@@ -64,6 +74,7 @@ import { RouteName } from "../router/keys";
 import { useUserStore } from "../stores/user";
 import { resolveMedia } from "../utils/resolveMedia";
 import { api } from "../utils/api";
+import { Search, PenLine, LogOut, LogIn, UserPlus, Bell } from "lucide-vue-next";
 
 const userStore = useUserStore();
 const searchQuery = ref("");
@@ -147,7 +158,7 @@ const confirmLogout = () => {
 .logo-text {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #333;
+  color: var(--color-text);
 }
 .search-bar {
   max-width: 600px;
@@ -156,7 +167,6 @@ const confirmLogout = () => {
   padding: 0.5rem 1rem;
 }
 .search-input {
-  flex: 1;
   border: none;
   background: transparent;
   outline: none;
@@ -165,7 +175,7 @@ const confirmLogout = () => {
 .profile-img {
   width: 30px;
   height: 30px;
-  background-color: #28a745;
+  background-color: var(--color-success);
   border-radius: 50%;
   margin-right: 8px;
   overflow: hidden;
@@ -176,24 +186,12 @@ const confirmLogout = () => {
   object-fit: cover;
 }
 
-/* Notification bell */
-.notif-bell {
+.search-icon {
+  color: #999;
+  flex-shrink: 0;
+}
+.notif-btn {
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  text-decoration: none;
-  transition: background 0.15s;
-}
-.notif-bell:hover {
-  background: #f0f0f0;
-}
-.bell-icon {
-  font-size: 1.2rem;
-  line-height: 1;
 }
 .badge {
   position: absolute;
@@ -206,9 +204,6 @@ const confirmLogout = () => {
   min-width: 16px;
   height: 16px;
   border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   padding: 0 3px;
   line-height: 1;
 }

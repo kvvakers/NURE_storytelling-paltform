@@ -1,14 +1,14 @@
 <template>
-  <div class="notifications-page">
+  <div class="notifications-page _page">
     <div class="_container">
       <div class="notifications-header _flex _ai-c _jc-sb">
         <h1>Сповіщення</h1>
         <button
           v-if="notifications.length > 0"
-          class="btn btn-secondary"
+          class="btn btn-secondary _flex _ai-c _gap-6"
           @click="markAllRead"
         >
-          Позначити всі як прочитані
+          <CheckCheck :size="16" />Позначити всі як прочитані
         </button>
       </div>
 
@@ -18,20 +18,20 @@
         У вас поки немає сповіщень
       </div>
 
-      <div v-else class="notifications-list">
+      <div v-else class="notifications-list _flex _flex-col _gap-12">
         <div
           v-for="n in notifications"
           :key="n.id"
-          class="notification-item"
+          class="notification-item panel _flex _ai-c _gap-16"
           :class="{ unread: !n.read }"
           @click="handleClick(n)"
         >
-          <div class="notification-icon">🗣</div>
-          <div class="notification-body">
+          <div class="notification-icon _shrink-0"><MessageSquare :size="22" /></div>
+          <div class="notification-body _flex-1">
             <p class="notification-message">{{ n.message }}</p>
             <span class="notification-date">{{ formatDate(n.createdAt) }}</span>
           </div>
-          <div v-if="!n.read" class="unread-dot"></div>
+          <div v-if="!n.read" class="unread-dot _shrink-0"></div>
         </div>
       </div>
     </div>
@@ -43,6 +43,7 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { RouteName } from '../router/keys';
 import { api } from '../utils/api';
+import { MessageSquare, CheckCheck } from "lucide-vue-next";
 
 interface Notification {
   id: number;
@@ -111,8 +112,6 @@ const formatDate = (date: string) => {
 
 <style scoped>
 .notifications-page {
-  padding: 40px 0;
-  min-height: 100vh;
   background: #f9f9f9;
 }
 
@@ -126,27 +125,8 @@ const formatDate = (date: string) => {
   color: #222;
 }
 
-.empty-state {
-  text-align: center;
-  color: #999;
-  padding: 80px 20px;
-  font-size: 1.1rem;
-}
-
-.notifications-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
 .notification-item {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  background: white;
-  border-radius: 10px;
   padding: 16px 20px;
-  box-shadow: var(--shadow-sm);
   cursor: pointer;
   transition: background 0.15s;
   position: relative;
@@ -161,17 +141,12 @@ const formatDate = (date: string) => {
 }
 
 .notification-icon {
-  font-size: 1.4rem;
-  flex-shrink: 0;
-}
-
-.notification-body {
-  flex: 1;
+  color: var(--color-primary);
 }
 
 .notification-message {
   margin: 0 0 4px;
-  color: #333;
+  color: var(--color-text);
   font-size: 0.97rem;
   line-height: 1.5;
 }
@@ -186,6 +161,5 @@ const formatDate = (date: string) => {
   height: 10px;
   border-radius: 50%;
   background: var(--color-primary);
-  flex-shrink: 0;
 }
 </style>

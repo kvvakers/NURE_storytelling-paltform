@@ -26,7 +26,7 @@
           class="stories-swiper swiper-fade"
         >
           <swiper-slide v-for="story in popularStoriesRef" :key="story.id">
-            <div class="story-card _flex _flex-col">
+            <div class="story-card panel _flex _flex-col">
               <RouterLink :to="{name: RouteName.STORY, params: {id: story.id}}">
                 <img :src="resolveMedia(story.cover) || 'src/assets/placeholder.jpg'" alt="cover" />
                 <div class="story-card-info">
@@ -50,9 +50,9 @@
           class="stories-swiper swiper-fade"
         >
           <swiper-slide v-for="story in newStories" :key="story.id">
-            <div class="story-card _flex _flex-col">
+            <div class="story-card panel _flex _flex-col">
               <RouterLink :to="{name: RouteName.STORY, params: {id: story.id}}">
-                <img :src="resolveMedia(story.cover) || 'src/assets/placeholder.jpg'" alt="cover" />
+                <img :src="resolveMedia(story.cover) || 'src/assets/placeholder.jpg'" alt="cover" class="_shrink-0" />
                 <div class="story-card-info">
                   <h3>{{ story.title }}</h3>
                   <p>{{ story.author || 'Автор не вказаний' }}</p>
@@ -128,7 +128,7 @@ onMounted(async () => {
 
 .hero p {
   font-size: 18px;
-  color: #666;
+  color: var(--color-text-muted);
   margin-bottom: 20px;
 }
 
@@ -145,10 +145,7 @@ onMounted(async () => {
 }
 
 .story-card {
-  background: white;
-  border-radius: 12px;
   padding: 12px;
-  box-shadow: var(--shadow-sm);
 }
 
 .story-card img {
@@ -157,12 +154,11 @@ onMounted(async () => {
   object-fit: cover;
   border-radius: 8px;
   margin-bottom: 10px;
-  flex-shrink: 0;
 }
 
 .story-card-info { padding: 10px 0; }
 .story-card-info h3 { margin: 0 0 6px; font-size: 1rem; color: #111; }
-.story-card-info p { margin: 2px 0; color: #666; font-size: 0.9rem; }
+.story-card-info p { margin: 2px 0; color: var(--color-text-muted); font-size: 0.9rem; }
 
 .swiper-fade {
   position: relative;

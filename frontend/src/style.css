@@ -52,6 +52,10 @@ a {
 /* ============================================================
    Layout utilities
    ============================================================ */
+._page {
+  padding: 40px 0;
+  min-height: 100vh;
+}
 ._h1 {
   font-size: 2.5rem;
 }
@@ -386,6 +390,57 @@ a {
 }
 .error-state {
   color: #b91c1c;
+}
+
+/* ============================================================
+   Panel (white card block — add padding via scoped)
+   ============================================================ */
+.panel {
+  background: var(--color-surface);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ============================================================
+   Author link
+   ============================================================ */
+.author-link {
+  color: var(--color-primary);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.author-link:hover {
+  opacity: 0.8;
+}
+
+/* ============================================================
+   Empty / zero-results state
+   ============================================================ */
+.empty-state {
+  text-align: center;
+  color: #999;
+  padding: 80px 20px;
+  font-size: 1.1rem;
+}
+
+/* ============================================================
+   Badge / tag pill
+   ============================================================ */
+.badge-primary {
+  padding: 6px 12px;
+  background: #e7f3ff;
+  color: var(--color-primary);
+  border-radius: 20px;
+  font-size: 0.9rem;
+}
+
+/* ============================================================
+   Divider
+   ============================================================ */
+.divider {
+  border: 0;
+  border-top: 1px solid #eee;
+  margin: 40px 0;
 }
 
 /* ============================================================

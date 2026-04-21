@@ -1,12 +1,12 @@
 <template>
-  <div v-if="story" class="story-page">
+  <div v-if="story" class="story-page _page">
     <div class="_container">
       <!-- Story Metadata -->
-      <div class="story-metadata _flex _gap-x-32">
+      <div class="story-metadata panel _flex _gap-x-32">
         <div>
           <img :src="resolveMedia(story.cover)" :alt="story.title" class="cover" />
         </div>
-        <div class="story-info">
+        <div class="story-info _flex-1">
           <h1 class="_h1">{{ story.title }}</h1>
           <p>
             <b>Автор:</b>
@@ -21,21 +21,21 @@
           <p><b>Рейтинг:</b> {{ story.rating }}/10</p>
           <p><b>Дата публікації:</b> {{ new Date(story.createdAt).toLocaleDateString('uk-UA') }}</p>
           <div class="genres _flex _flex-wrap _gap-8">
-            <span v-for="g in story.genres" :key="g" class="genre">{{ g }}</span>
+            <span v-for="g in story.genres" :key="g" class="badge-primary">{{ g }}</span>
           </div>
           <div v-if="story.isMine" class="story-owner-actions _flex _gap-12">
-            <button class="btn btn-secondary" @click="openEditStory">✏️ Редагувати</button>
-            <button class="btn btn-danger" @click="deleteStoryModal = true">🗑 Видалити</button>
+            <button class="btn btn-secondary _flex _ai-c _gap-6" @click="openEditStory"><Pencil :size="15" />Редагувати</button>
+            <button class="btn btn-danger _flex _ai-c _gap-6" @click="deleteStoryModal = true"><Trash2 :size="15" />Видалити</button>
           </div>
         </div>
       </div>
 
       <!-- Chapters list -->
-      <div class="chapters-section">
+      <div class="chapters-section panel">
         <div class="chapters-header _flex _ai-c _jc-sb">
           <h2>Глави ({{ chapters.length }})</h2>
-          <button v-if="story.isMine" type="button" class="btn btn-primary" @click="goToAddChapter">
-            + Додати главу
+          <button v-if="story.isMine" type="button" class="btn btn-primary _flex _ai-c _gap-6" @click="goToAddChapter">
+            <Plus :size="16" />Додати главу
           </button>
         </div>
 
@@ -44,28 +44,28 @@
         </div>
 
         <div v-else class="chapter-list _flex _flex-col _gap-12">
-          <div v-for="(ch, idx) in chapters" :key="idx" class="chapter-card">
-            <div class="chapter-card-main _flex _flex-col _gap-4" @click="goToRead(idx)">
+          <div v-for="(ch, idx) in chapters" :key="idx" class="chapter-card _flex-col _ai-fs">
+            <div class="chapter-card-main _flex _flex-col _gap-4 _flex-1 _min-w-0" @click="goToRead(idx)">
               <span class="chapter-number">Глава {{ idx + 1 }}</span>
               <span class="chapter-title">{{ ch.title }}</span>
               <span class="chapter-preview">{{ stripHtml(ch.content).slice(0, 120) }}{{ ch.content.length > 120 ? '…' : '' }}</span>
             </div>
-            <div v-if="story.isMine" class="chapter-card-actions _flex _gap-8 _shrink-0">
+            <div v-if="story.isMine" class="chapter-card-actions _flex _gap-8 _shrink-0 _jc-fe">
               <button
                 type="button"
-                class="btn btn-secondary btn-sm"
+                class="btn btn-secondary _flex _ai-c _gap-6"
                 @click.stop="editChapter(idx)"
                 title="Редагувати"
               >
-                ✏ Редагувати
+                <Pencil :size="14" />Редагувати
               </button>
               <button
                 type="button"
-                class="btn btn-danger btn-sm"
+                class="btn btn-danger _flex _ai-c _gap-6"
                 @click.stop="confirmDeleteChapter(idx)"
                 title="Видалити"
               >
-                🗑 Видалити
+                <Trash2 :size="14" />Видалити
               </button>
             </div>
           </div>
@@ -184,6 +184,7 @@ import { useToast } from "../composables/useToast";
 import { RouteName } from "../router/keys";
 import { api } from '../utils/api';
 import { resolveMedia } from '../utils/resolveMedia';
+import { Pencil, Trash2, Plus } from "lucide-vue-next";
 
 interface Chapter {
   title: string;
@@ -375,18 +376,7 @@ const stripHtml = (html: string) => {
 </script>
 
 <style scoped>
-.author-link {
-  color: var(--color-primary);
-  cursor: pointer;
-  text-decoration: underline;
-}
-.author-link:hover {
-  opacity: 0.8;
-}
-
 .story-page {
-  padding: 40px 0;
-  min-height: 100vh;
   background-color: #f9f9f9;
 }
 
@@ -394,15 +384,12 @@ const stripHtml = (html: string) => {
   text-align: center;
   padding: 60px 20px;
   font-size: 1.2rem;
-  color: #666;
+  color: var(--color-text-muted);
 }
 
 .story-metadata {
-  background: white;
   padding: 40px;
-  border-radius: 12px;
   margin-bottom: 40px;
-  box-shadow: var(--shadow-sm);
 }
 
 .cover {
@@ -410,28 +397,21 @@ const stripHtml = (html: string) => {
   height: 400px;
   object-fit: cover;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-sm);
 }
 
-.story-info { flex: 1; }
-.story-info h1 { margin: 0 0 20px; color: #333; }
+.story-info h1 { margin: 0 0 20px; color: var(--color-text); }
 .story-info p { margin: 8px 0; color: #555; }
 
-.genres { margin-top: 16px; }
-.genre { padding: 6px 12px; background: #e7f3ff; color: var(--color-primary); border-radius: 20px; font-size: 0.9rem; }
-
 .chapters-section {
-  background: white;
-  border-radius: 12px;
   padding: 32px 40px;
-  box-shadow: var(--shadow-sm);
 }
 
 .chapters-header {
   margin-bottom: 24px;
 }
 
-.chapters-header h2 { margin: 0; font-size: 1.4rem; color: #333; }
+.chapters-header h2 { margin: 0; font-size: 1.4rem; color: var(--color-text); }
 
 .no-chapters {
   color: #999;
@@ -442,7 +422,7 @@ const stripHtml = (html: string) => {
 
 .chapter-card {
   border: 1px solid #e8e8e8;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 18px 20px;
   transition: box-shadow 0.2s, border-color 0.2s;
 }
@@ -454,8 +434,6 @@ const stripHtml = (html: string) => {
 
 .chapter-card-main {
   cursor: pointer;
-  flex: 1;
-  min-width: 0;
 }
 
 .chapter-number {
@@ -493,7 +471,7 @@ const stripHtml = (html: string) => {
   width: 80px;
   height: 112px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
 }
 
@@ -501,7 +479,6 @@ const stripHtml = (html: string) => {
   .story-metadata { flex-direction: column; padding: 20px; }
   .cover { width: 100%; height: auto; }
   .chapters-section { padding: 20px; }
-  .chapter-card { flex-direction: column; align-items: flex-start; }
-  .chapter-card-actions { width: 100%; justify-content: flex-end; }
+  .chapter-card-actions { width: 100%; }
 }
 </style>

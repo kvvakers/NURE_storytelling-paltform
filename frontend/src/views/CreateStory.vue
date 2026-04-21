@@ -1,9 +1,9 @@
 <template>
-  <div class="create-story">
+  <div class="create-story _page">
     <div class="_container">
       <h1 class="_h1">Створити історію</h1>
       
-      <form @submit.prevent="submitStory" class="form">
+      <form @submit.prevent="submitStory" class="form panel">
         <!-- Cover Image -->
         <div class="form-group">
           <label for="cover">Обкладинка</label>
@@ -42,7 +42,7 @@
             type="text"
             placeholder="Введіть назву історії"
             required
-            class="input"
+            class="form-input"
           />
         </div>
 
@@ -55,7 +55,7 @@
             placeholder="Опишіть вашу історію"
             rows="6"
             required
-            class="textarea"
+            class="form-input form-textarea"
           ></textarea>
         </div>
 
@@ -67,14 +67,14 @@
             v-model="formData.characters"
             type="text"
             placeholder="Персонажі через кому (наприклад: Іван, Марія, Петро)"
-            class="input"
+            class="form-input"
           />
         </div>
 
         <!-- Categories (Genres) -->
         <div class="form-group">
           <label>Категорія (жанр)</label>
-          <div class="checkbox-group">
+          <div class="checkbox-group _gap-12">
             <label v-for="genre in availableGenres" :key="genre" class="checkbox-label _flex _ai-c">
               <input
                 type="checkbox"
@@ -95,10 +95,10 @@
             v-model="formData.tags"
             type="text"
             placeholder="Теги через кому (наприклад: фантастика, пригода, любов)"
-            class="input"
+            class="form-input"
           />
           <div class="tags-preview _flex _flex-wrap _gap-8">
-            <span v-for="tag in parsedTags" :key="tag" class="tag">
+            <span v-for="tag in parsedTags" :key="tag" class="badge-primary _flex _ai-c _gap-6">
               {{ tag }}
               <button
                 type="button"
@@ -112,7 +112,7 @@
         <!-- Language -->
         <div class="form-group">
           <label for="language">Мова</label>
-          <select v-model="formData.language" id="language" class="select" required>
+          <select v-model="formData.language" id="language" class="form-input" required>
             <option value="">Виберіть мову</option>
             <option value="uk">Українська</option>
             <option value="ru">Русский</option>
@@ -268,11 +268,6 @@ const submitStory = async () => {
 </script>
 
 <style scoped>
-.create-story {
-  padding: 40px 0;
-  min-height: 100vh;
-}
-
 h1 {
   margin-bottom: 40px;
   text-align: center;
@@ -281,9 +276,8 @@ h1 {
 .form {
   max-width: 700px;
   margin: 0 auto;
-  background: #fff;
   padding: 32px;
-  border-radius: 12px;
+  box-shadow: none;
   border: 1px solid #e5e5e5;
 }
 
@@ -295,32 +289,11 @@ h1 {
   display: block;
   margin-bottom: 8px;
   font-weight: 600;
-  color: #333;
+  color: var(--color-text);
   font-size: 0.95rem;
 }
 
-.input,
-.textarea,
-.select {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 1rem;
-  font-family: inherit;
-  transition: border-color 0.3s ease;
-}
-
-.input:focus,
-.textarea:focus,
-.select:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
-}
-
-.textarea {
-  resize: vertical;
+.form-textarea {
   min-height: 120px;
 }
 
@@ -372,7 +345,7 @@ h1 {
 }
 
 .upload-placeholder:hover {
-  border-color: #007bff;
+  border-color: var(--color-primary);
   background-color: #f0f7ff;
 }
 
@@ -382,7 +355,7 @@ h1 {
 }
 
 .upload-placeholder p {
-  color: #666;
+  color: var(--color-text-muted);
   margin: 0;
 }
 
@@ -404,13 +377,12 @@ h1 {
 .checkbox-group {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 12px;
 }
 
 .checkbox-label {
   cursor: pointer;
   padding: 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   transition: background-color 0.2s ease;
 }
 
@@ -423,27 +395,16 @@ h1 {
   height: 18px;
   margin-right: 8px;
   cursor: pointer;
-  accent-color: #007bff;
+  accent-color: var(--color-primary);
 }
 
 .checkbox-label span {
-  color: #333;
+  color: var(--color-text);
 }
 
 /* Tags */
 .tags-preview {
   margin-top: 12px;
-}
-
-.tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background-color: #e7f3ff;
-  color: #007bff;
-  border-radius: 20px;
-  font-size: 0.9rem;
 }
 
 .tag-remove {

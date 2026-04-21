@@ -7,7 +7,7 @@
         <div class="profile-main _flex _gap-40 _ai-fs">
           <img :src="resolveMedia(profile.avatar) || 'https://via.placeholder.com/150'" :alt="profile.username || profile.email" class="profile-avatar" />
           
-          <div class="profile-info">
+          <div class="profile-info _flex-1">
             <div class="profile-title _flex _ai-c _gap-20">
               <h1 class="nickname">{{ profile.username || profile.email }}</h1>
               <button v-if="isCurrentUser" class="btn btn-secondary" @click="openEdit">Редагувати профіль</button>
@@ -19,10 +19,10 @@
 
             <div class="stats _flex _gap-30">
               <div class="stat-item"><b>{{ authorStories.length }}</b> праць</div>
-              <div class="stat-item stat-link" @click="showFollowersModal = true">
+              <div class="stat-item author-link" @click="showFollowersModal = true">
                 <b>{{ followers.length }}</b> підписників
               </div>
-              <div class="stat-item stat-link" @click="showFollowingModal = true">
+              <div class="stat-item author-link" @click="showFollowingModal = true">
                 <b>{{ following.length }}</b> підписок
               </div>
             </div>
@@ -85,7 +85,7 @@
       <div class="modal">
         <h2 class="modal-title">Підписники ({{ followers.length }})</h2>
         <div v-if="followers.length === 0" class="modal-empty">Поки немає підписників</div>
-        <div v-else class="user-list">
+        <div v-else class="user-list _flex _flex-col _gap-10">
           <div
             v-for="u in followers"
             :key="u.id"
@@ -107,7 +107,7 @@
       <div class="modal">
         <h2 class="modal-title">Підписки ({{ following.length }})</h2>
         <div v-if="following.length === 0" class="modal-empty">Поки немає підписок</div>
-        <div v-else class="user-list">
+        <div v-else class="user-list _flex _flex-col">
           <div
             v-for="u in following"
             :key="u.id"
@@ -308,8 +308,6 @@ async function saveProfile() {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.profile-info { flex: 1; }
-
 .profile-title {
   margin-bottom: 20px;
 }
@@ -326,13 +324,6 @@ async function saveProfile() {
 
 .stat-item { font-size: 16px; }
 
-.stat-link {
-  cursor: pointer;
-  color: var(--color-primary);
-  text-decoration: underline;
-}
-.stat-link:hover { opacity: 0.8; }
-
 .modal-empty {
   color: #999;
   text-align: center;
@@ -340,9 +331,6 @@ async function saveProfile() {
 }
 
 .user-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
   max-height: 360px;
   overflow-y: auto;
   margin-bottom: 16px;
@@ -366,7 +354,7 @@ async function saveProfile() {
 
 .user-list-name {
   font-size: 0.95rem;
-  color: #333;
+  color: var(--color-text);
 }
 
 .bio {
@@ -379,12 +367,6 @@ async function saveProfile() {
   margin-top: 10px;
   font-size: 13px;
   color: #888;
-}
-
-.divider {
-  border: 0;
-  border-top: 1px solid #eee;
-  margin: 40px 0;
 }
 
 .section-title {

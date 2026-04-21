@@ -1,5 +1,5 @@
 <template>
-  <div class="stories">
+  <div class="stories-grid">
     <div v-for="story in stories" :key="story.id">
       <Card :story="story"/>
     </div>
@@ -59,12 +59,3 @@ const loadStories = async () => {
 onMounted(loadStories);
 watch(() => route.params.query, loadStories);
 </script>
-
-<style scoped>
-.stories {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 24px;
-  padding: 30px;
-}
-</style>

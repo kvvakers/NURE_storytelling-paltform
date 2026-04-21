@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(sed -n '344,348p' \"c:/projects/_nure/diploma-alina/frontend/src/views/ReadChapter.vue\")",
+      "Bash(sed -n '410,418p' \"c:/projects/_nure/diploma-alina/frontend/src/views/ReadChapter.vue\")",
+      "Bash(sed -n '452,458p' \"c:/projects/_nure/diploma-alina/frontend/src/views/ReadChapter.vue\")"
+    ]
+  }
+}

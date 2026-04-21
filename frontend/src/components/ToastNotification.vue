@@ -52,10 +52,10 @@ const icons: Record<string, string> = {
   color: #fff;
 }
 
-.toast--success { background-color: #28a745; }
-.toast--error   { background-color: #dc3545; }
-.toast--warning { background-color: #fd7e14; color: #fff; }
-.toast--info    { background-color: #007bff; }
+.toast--success { background-color: var(--color-success); }
+.toast--error   { background-color: var(--color-danger); }
+.toast--warning { background-color: var(--color-warning); color: #fff; }
+.toast--info    { background-color: var(--color-primary); }
 
 .toast__icon {
   font-size: 1.1rem;

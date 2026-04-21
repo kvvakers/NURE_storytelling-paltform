@@ -1,33 +1,33 @@
 <template>
-  <div v-if="chapter" class="read-page">
+  <div v-if="chapter" class="read-page _page">
     <div class="_container">
       <!-- Header -->
       <div class="read-header _flex _ai-c _jc-sb _flex-wrap _gap-12">
-        <button class="btn btn-secondary back-btn" @click="router.push({ name: RouteName.STORY, params: { id: storyId } })">
-          ← Назад до історії
+        <button class="btn btn-secondary back-btn _flex _ai-c _gap-6" @click="router.push({ name: RouteName.STORY, params: { id: storyId } })">
+          <ArrowLeft :size="16" />Назад до історії
         </button>
         <div class="read-nav _flex _ai-c _gap-16">
           <button
-            class="btn btn-secondary"
+            class="btn btn-secondary _flex _ai-c _gap-6"
             :disabled="chapterIndex <= 0"
             @click="navigateTo(chapterIndex - 1)"
           >
-            ← Попередня
+            <ChevronLeft :size="16" />Попередня
           </button>
           <span class="chapter-counter">Глава {{ chapterIndex + 1 }} / {{ totalChapters }}</span>
           <button
-            class="btn btn-secondary"
+            class="btn btn-secondary _flex _ai-c _gap-6"
             :disabled="chapterIndex >= totalChapters - 1"
             @click="navigateTo(chapterIndex + 1)"
           >
-            Наступна →
+            Наступна<ChevronRight :size="16" />
           </button>
         </div>
       </div>
 
       <!-- Chapter Content -->
-      <div class="read-body">
-        <h1 class="chapter-title">{{ chapter.title }}</h1>
+      <div class="read-body panel">
+        <h1 class="chapter-title _h2">{{ chapter.title }}</h1>
         <div
           ref="chapterTextRef"
           class="chapter-text"
@@ -41,8 +41,8 @@
           class="comment-tooltip"
           :style="tooltipPosition"
         >
-          <button @click="openCommentPanel" class="btn btn-primary">
-            🗣 Додати коментар</button>
+          <button @click="openCommentPanel" class="btn btn-primary _flex _ai-c _gap-6">
+            <MessageSquare :size="15" />Додати коментар</button>
         </div>
 
         <!-- Comment Input Panel -->
@@ -58,7 +58,7 @@
           <textarea
             v-model="newCommentText"
             placeholder="Напишіть ваш коментар..."
-            class="comment-textarea"
+            class="form-input form-textarea comment-textarea"
           ></textarea>
           <div class="comment-panel-actions _flex _gap-12">
             <button @click="submitComment" class="btn btn-primary">Опублікувати</button>
@@ -68,12 +68,12 @@
       </div>
 
       <!-- General Comment Form -->
-      <div class="general-comment-form">
+      <div class="general-comment-form panel">
         <h3>Залишити коментар</h3>
         <textarea
           v-model="generalCommentText"
           placeholder="Напишіть ваш коментар до глави..."
-          class="comment-textarea"
+          class="form-input form-textarea comment-textarea"
           rows="4"
         ></textarea>
         <div class="general-comment-actions _flex _gap-12">
@@ -82,7 +82,7 @@
       </div>
 
       <!-- Comments -->
-      <div v-if="comments.length > 0" class="comments-section">
+      <div v-if="comments.length > 0" class="comments-section panel">
         <h3>Коментарі ({{ comments.length }})</h3>
         <div v-for="(comment, idx) in comments" :key="idx" class="comment-block">
           <div v-if="comment.selectedText" class="comment-quote-section">
@@ -108,7 +108,7 @@
             {{ expandedReplyIndex === idx ? 'Сховати' : 'Відповісти' }}
           </button>
           <div v-if="expandedReplyIndex === idx" class="reply-input-section">
-            <textarea v-model="replyText" placeholder="Ваша відповідь..." class="reply-textarea"></textarea>
+            <textarea v-model="replyText" placeholder="Ваша відповідь..." class="form-input form-textarea reply-textarea"></textarea>
             <div class="reply-actions _flex _gap-8">
               <button @click="submitReply(idx)" class="btn btn-primary">Надіслати</button>
               <button @click="toggleReply(-1)" class="btn btn-secondary">Скасувати</button>
@@ -120,24 +120,24 @@
       <!-- Bottom navigation -->
       <div class="read-footer _flex _jc-sb">
         <button
-          class="btn btn-secondary"
+          class="btn btn-secondary _flex _ai-c _gap-6"
           :disabled="chapterIndex <= 0"
           @click="navigateTo(chapterIndex - 1)"
         >
-          ← Попередня глава
+          <ChevronLeft :size="16" />Попередня глава
         </button>
         <button
-          class="btn btn-primary"
+          class="btn btn-primary _flex _ai-c _gap-6"
           :disabled="chapterIndex >= totalChapters - 1"
           @click="navigateTo(chapterIndex + 1)"
         >
-          Наступна глава →
+          Наступна глава<ChevronRight :size="16" />
         </button>
       </div>
     </div>
   </div>
 
-  <div v-else class="loading">
+  <div v-else class="empty-state">
     <p>Завантаження...</p>
   </div>
 </template>
@@ -149,6 +149,7 @@ import { useUserStore } from "../stores/user";
 import { useToast } from "../composables/useToast";
 import { RouteName } from "../router/keys";
 import { api } from '../utils/api';
+import { ArrowLeft, ChevronLeft, ChevronRight, MessageSquare } from "lucide-vue-next";
 
 interface Reply {
   id?: string;
@@ -342,16 +343,7 @@ const formatDate = (date: string | Date | undefined) => {
 
 <style scoped>
 .read-page {
-  padding: 40px 0;
-  min-height: 100vh;
   background: #f9f9f9;
-}
-
-.loading {
-  text-align: center;
-  padding: 80px 20px;
-  color: #999;
-  font-size: 1.1rem;
 }
 
 .read-header {
@@ -359,7 +351,7 @@ const formatDate = (date: string | Date | undefined) => {
 }
 
 .chapter-counter {
-  color: #666;
+  color: var(--color-text-muted);
   font-size: 0.95rem;
   white-space: nowrap;
 }
@@ -369,16 +361,12 @@ const formatDate = (date: string | Date | undefined) => {
 }
 
 .read-body {
-  background: white;
-  border-radius: 12px;
   padding: 48px 56px;
-  box-shadow: var(--shadow-sm);
   margin-bottom: 32px;
   position: relative;
 }
 
 .chapter-title {
-  font-size: 2rem;
   color: #222;
   margin: 0 0 36px;
   font-weight: 700;
@@ -387,7 +375,7 @@ const formatDate = (date: string | Date | undefined) => {
 .chapter-text {
   font-size: 1.05rem;
   line-height: 1.95;
-  color: #333;
+  color: var(--color-text);
   user-select: text;
 }
 
@@ -416,37 +404,24 @@ const formatDate = (date: string | Date | undefined) => {
   margin-top: 24px;
 }
 .comment-panel-header { margin-bottom: 16px; }
-.comment-panel-header h3 { margin: 0; color: #333; }
+.comment-panel-header h3 { margin: 0; color: var(--color-text); }
 .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; }
-.close-btn:hover { color: #333; }
+.close-btn:hover { color: var(--color-text); }
 .comment-quote-preview { background: white; padding: 12px; border-radius: 8px; margin-bottom: 16px; }
 .comment-quote-preview p:first-child { margin: 0 0 8px; font-weight: 600; font-size: 0.9rem; color: #555; }
 .quote { margin: 0; font-style: italic; color: var(--color-primary); }
 .comment-textarea {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  font-size: 1rem;
-  font-family: inherit;
-  resize: vertical;
   min-height: 90px;
   margin-bottom: 12px;
-  box-sizing: border-box;
 }
-.comment-textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1); }
-
 /* General Comment Form */
 .general-comment-form {
-  background: white;
-  border-radius: 12px;
   padding: 32px 40px;
-  box-shadow: var(--shadow-sm);
   margin-bottom: 32px;
 }
 .general-comment-form h3 {
   margin: 0 0 16px;
-  color: #333;
+  color: var(--color-text);
 }
 .general-comment-actions {
   margin-top: 12px;
@@ -454,13 +429,10 @@ const formatDate = (date: string | Date | undefined) => {
 
 /* Comments section */
 .comments-section {
-  background: white;
-  border-radius: 12px;
   padding: 32px 40px;
-  box-shadow: var(--shadow-sm);
   margin-bottom: 32px;
 }
-.comments-section h3 { margin: 0 0 24px; color: #333; }
+.comments-section h3 { margin: 0 0 24px; color: var(--color-text); }
 .comment-block {
   background: #f8f9fa;
   border-left: 4px solid var(--color-primary);
@@ -468,32 +440,22 @@ const formatDate = (date: string | Date | undefined) => {
   margin-bottom: 20px;
   border-radius: 8px;
 }
-.comment-quote-section { background: white; padding: 12px; border-radius: 6px; margin-bottom: 12px; }
+.comment-quote-section { background: white; padding: 12px; border-radius: var(--radius-sm); margin-bottom: 12px; }
 .comment-quote { margin: 0; font-style: italic; color: var(--color-primary); font-weight: 500; }
 .comment-content { margin-bottom: 12px; }
-.comment-text { margin: 0 0 8px; color: #333; line-height: 1.6; }
+.comment-text { margin: 0 0 8px; color: var(--color-text); line-height: 1.6; }
 .comment-meta { font-size: 0.85rem; color: #999; }
-.comment-author { font-weight: 600; color: #666; }
+.comment-author { font-weight: 600; color: var(--color-text-muted); }
 .replies { margin-top: 12px; padding-left: 20px; border-left: 2px solid var(--color-border); }
-.reply { background: white; padding: 12px; border-radius: 6px; margin-bottom: 8px; }
-.reply-text { margin: 0 0 6px; color: #333; }
+.reply { background: white; padding: 12px; border-radius: var(--radius-sm); margin-bottom: 8px; }
+.reply-text { margin: 0 0 6px; color: var(--color-text); }
 .reply-meta { font-size: 0.85rem; color: #999; }
-.reply-author { font-weight: 600; color: #666; }
-.reply-input-section { margin-top: 12px; padding: 12px; background: white; border-radius: 6px; }
+.reply-author { font-weight: 600; color: var(--color-text-muted); }
+.reply-input-section { margin-top: 12px; padding: 12px; background: white; border-radius: var(--radius-sm); }
 .reply-textarea {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  font-size: 0.95rem;
-  font-family: inherit;
-  resize: vertical;
   min-height: 60px;
   margin-bottom: 8px;
-  box-sizing: border-box;
 }
-.reply-textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1); }
-
 /* Footer nav */
 .read-footer {
   padding-bottom: 40px;

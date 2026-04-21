@@ -6,15 +6,15 @@
       <h2 class="title">{{ story.title }}</h2>
 
       <div class="meta _flex _flex-wrap _gap-10">
-        <span>
-          <b>Автор:</b>
+        <span class="_flex _ai-c _gap-4">
+          <User :size="13" />
           <span
             :class="{ 'author-link': story.ownerId }"
             @click.prevent.stop="story.ownerId && router.push({ name: RouteName.PROFILE, params: { id: story.ownerId } })"
           >{{ story.author }}</span>
         </span>
-        <span><b>Рейтинг:</b> {{ story.rating }}/10</span>
-        <span><b>Дата:</b> {{ formatDate(story.created_at) }}</span>
+        <span class="_flex _ai-c _gap-4"><Star :size="13" /> {{ story.rating }}/10</span>
+        <span class="_flex _ai-c _gap-4"><Calendar :size="13" /> {{ formatDate(story.created_at) }}</span>
       </div>
 
       <p class="description">
@@ -35,6 +35,7 @@ import { useRouter } from "vue-router";
 import { RouteName } from "../router/keys";
 import { formatDate } from "../utils/formatDate";
 import { resolveMedia } from "../utils/resolveMedia";
+import { User, Star, Calendar } from "lucide-vue-next";
 
 const router = useRouter();
 
@@ -49,9 +50,9 @@ defineProps({
 <style scoped>
 .card {
   background: #fff;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-sm);
   border: 1px solid transparent;
   cursor: pointer;
 }
@@ -71,15 +72,7 @@ defineProps({
 }
 .meta {
   font-size: 13px;
-  color: #666;
-}
-.author-link {
-  color: var(--color-primary);
-  cursor: pointer;
-  text-decoration: underline;
-}
-.author-link:hover {
-  opacity: 0.8;
+  color: var(--color-text-muted);
 }
 .description {
   font-size: 14px;

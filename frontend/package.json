@@ -19,6 +19,7 @@
     "@tiptap/pm": "^3.22.3",
     "@tiptap/starter-kit": "^3.22.3",
     "@tiptap/vue-3": "^3.22.3",
+    "lucide-vue-next": "^1.0.0",
     "pinia": "^3.0.4",
     "swiper": "^12.1.1",
     "vue": "^3.5.22",
