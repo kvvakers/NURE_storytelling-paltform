@@ -9,4 +9,5 @@ export const RouteName = Object.freeze({
   WRITE_CHAPTER: "write-chapter",
   LOGIN: "login",
   REGISTER: "register",
+  NOTIFICATIONS: "notifications",
 });

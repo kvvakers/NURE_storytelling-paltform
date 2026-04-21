@@ -11,16 +11,25 @@
             <div class="profile-title _flex _ai-c _gap-20">
               <h1 class="nickname">{{ profile.username || profile.email }}</h1>
               <button v-if="isCurrentUser" class="btn btn-secondary" @click="openEdit">Редагувати профіль</button>
-              <button v-else class="btn btn-primary">Підписатися +</button>
+              <template v-else-if="userStore.isAuthorized">
+                <button v-if="isFollowing" class="btn btn-secondary" @click="toggleFollow"><span>Відписатися</span></button>
+                <button v-else class="btn btn-primary" @click="toggleFollow"><span>Підписатися +</span></button>
+              </template>
             </div>
 
             <div class="stats _flex _gap-30">
               <div class="stat-item"><b>{{ authorStories.length }}</b> праць</div>
+              <div class="stat-item stat-link" @click="showFollowersModal = true">
+                <b>{{ followers.length }}</b> підписників
+              </div>
+              <div class="stat-item stat-link" @click="showFollowingModal = true">
+                <b>{{ following.length }}</b> підписок
+              </div>
             </div>
 
             <div class="bio">
               <p>{{ profile.bio || 'Немає опису' }}</p>
-              <span class="reg-date">З {{ formatDate(profile.createdAt) }}</span>
+              <span class="reg-date">Працює з {{ formatDate(profile.createdAt) }}</span>
             </div>
           </div>
         </div>
@@ -70,25 +79,76 @@
         </div>
       </div>
     </div>
+
+    <!-- Followers modal -->
+    <div v-if="showFollowersModal" class="modal-overlay" @click.self="showFollowersModal = false">
+      <div class="modal">
+        <h2 class="modal-title">Підписники ({{ followers.length }})</h2>
+        <div v-if="followers.length === 0" class="modal-empty">Поки немає підписників</div>
+        <div v-else class="user-list">
+          <div
+            v-for="u in followers"
+            :key="u.id"
+            class="user-list-item _flex _ai-c _gap-12"
+            @click="goToProfile(u.id)"
+          >
+            <img :src="resolveMedia(u.avatar)" class="user-list-avatar" alt="avatar" />
+            <span class="user-list-name">{{ u.username || u.email }}</span>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" @click="showFollowersModal = false">Закрити</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Following modal -->
+    <div v-if="showFollowingModal" class="modal-overlay" @click.self="showFollowingModal = false">
+      <div class="modal">
+        <h2 class="modal-title">Підписки ({{ following.length }})</h2>
+        <div v-if="following.length === 0" class="modal-empty">Поки немає підписок</div>
+        <div v-else class="user-list">
+          <div
+            v-for="u in following"
+            :key="u.id"
+            class="user-list-item _flex _ai-c _gap-12"
+            @click="goToProfile(u.id)"
+          >
+            <img :src="resolveMedia(u.avatar)" class="user-list-avatar" alt="avatar" />
+            <span class="user-list-name">{{ u.username || u.email }}</span>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" @click="showFollowingModal = false">Закрити</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { formatDate } from "../utils/formatDate";
 import Card from "../components/Card.vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { api } from "../utils/api";
 import { useUserStore } from "../stores/user";
 import { resolveMedia } from "../utils/resolveMedia";
+import { RouteName } from "../router/keys";
 
 const route = useRoute();
+const router = useRouter();
 const userStore = useUserStore();
 
 const profile = ref({});
 const authorStories = ref([]);
 const isLoading = ref(true);
 const errorMessage = ref(null);
+const followers = ref([]);
+const following = ref([]);
+const isFollowing = ref(false);
+const showFollowersModal = ref(false);
+const showFollowingModal = ref(false);
 
 const showEditModal = ref(false);
 const isSaving = ref(false);
@@ -106,7 +166,15 @@ const parsedParamId = computed(() => {
 const isOwnProfile = computed(() => !parsedParamId.value || parsedParamId.value === userStore.user?.id);
 const isCurrentUser = computed(() => userStore.isAuthorized && isOwnProfile.value);
 
-onMounted(async () => {
+async function loadProfile() {
+  isLoading.value = true;
+  errorMessage.value = null;
+  profile.value = {};
+  authorStories.value = [];
+  followers.value = [];
+  following.value = [];
+  isFollowing.value = false;
+
   const useMe = isOwnProfile.value && userStore.isAuthorized;
   if (!useMe && !parsedParamId.value) {
     errorMessage.value = 'Профіль не знайдено';
@@ -115,20 +183,62 @@ onMounted(async () => {
   }
   try {
     if (useMe) {
-      // Дані вже свіжі зі стору (loadAuth викликав refreshUser)
-      profile.value = { ...userStore.user };
+      profile.value = await api.get('/users/me');
     } else {
       profile.value = await api.get(`/users/${parsedParamId.value}`);
     }
     const ownerId = profile.value.id;
-    const allStories = await api.get('/stories');
-    authorStories.value = allStories.filter(s => s.ownerId === ownerId);
+    const [allStories, followersData, followingData] = await Promise.all([
+      api.get('/stories'),
+      api.get(`/users/${ownerId}/followers`),
+      api.get(`/users/${ownerId}/following`),
+    ]);
+    authorStories.value = allStories.filter(s => s.ownerId === ownerId).map(story => ({
+      ...story,
+      created_at: story.createdAt ?? story.created_at,
+    }));
+    followers.value = Array.isArray(followersData) ? followersData : [];
+    following.value = Array.isArray(followingData) ? followingData : [];
+
+    if (!isOwnProfile.value && userStore.isAuthorized) {
+      const status = await api.get(`/users/${ownerId}/follow-status`);
+      isFollowing.value = status?.following ?? false;
+    }
   } catch (e) {
     errorMessage.value = 'Не вдалося завантажити профіль';
   } finally {
     isLoading.value = false;
   }
-});
+}
+
+onMounted(loadProfile);
+watch(() => route.params.id, loadProfile);
+
+async function toggleFollow() {
+  const targetId = profile.value.id;
+  if (!targetId) return;
+  try {
+    if (isFollowing.value) {
+      await api.del(`/users/${targetId}/follow`);
+      isFollowing.value = false;
+      followers.value = followers.value.filter(f => f.id !== userStore.user?.id);
+    } else {
+      await api.post(`/users/${targetId}/follow`);
+      isFollowing.value = true;
+      if (userStore.user) {
+        followers.value = [...followers.value, { id: userStore.user.id, username: userStore.user.username, email: userStore.user.email, avatar: userStore.user.avatar }];
+      }
+    }
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function goToProfile(id) {
+  showFollowersModal.value = false;
+  showFollowingModal.value = false;
+  router.push({ name: RouteName.PROFILE, params: { id } });
+}
 
 function openEdit() {
   editForm.username = profile.value.username || '';
@@ -216,6 +326,49 @@ async function saveProfile() {
 
 .stat-item { font-size: 16px; }
 
+.stat-link {
+  cursor: pointer;
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+.stat-link:hover { opacity: 0.8; }
+
+.modal-empty {
+  color: #999;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+
+.user-list-item {
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.user-list-item:hover { background: #f0f4ff; }
+
+.user-list-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #eee;
+}
+
+.user-list-name {
+  font-size: 0.95rem;
+  color: #333;
+}
+
 .bio {
   line-height: 1.6;
   color: #444;
@@ -242,5 +395,10 @@ async function saveProfile() {
 .avatar-preview {
   width: 72px;
   height: 72px;
+}
+
+.btn span {
+  display: inline-block;
+  width: 140px;
 }
 </style>

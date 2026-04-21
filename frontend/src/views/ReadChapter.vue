@@ -67,11 +67,25 @@
         </div>
       </div>
 
+      <!-- General Comment Form -->
+      <div class="general-comment-form">
+        <h3>Залишити коментар</h3>
+        <textarea
+          v-model="generalCommentText"
+          placeholder="Напишіть ваш коментар до глави..."
+          class="comment-textarea"
+          rows="4"
+        ></textarea>
+        <div class="general-comment-actions _flex _gap-12">
+          <button @click="submitGeneralComment" class="btn btn-primary">Опублікувати</button>
+        </div>
+      </div>
+
       <!-- Comments -->
       <div v-if="comments.length > 0" class="comments-section">
         <h3>Коментарі ({{ comments.length }})</h3>
         <div v-for="(comment, idx) in comments" :key="idx" class="comment-block">
-          <div class="comment-quote-section">
+          <div v-if="comment.selectedText" class="comment-quote-section">
             <p class="comment-quote">"{{ comment.selectedText }}"</p>
           </div>
           <div class="comment-content">
@@ -181,6 +195,7 @@ const newCommentText = ref("");
 const tooltipPosition = ref({ top: "0px", left: "0px" });
 const expandedReplyIndex = ref(-1);
 const replyText = ref("");
+const generalCommentText = ref("");
 const chapterTextRef = ref<HTMLElement | null>(null);
 
 const loadChapter = async () => {
@@ -245,6 +260,26 @@ const closeCommentPanel = () => {
   showCommentPanel.value = false;
   newCommentText.value = "";
   selectedText.value = "";
+};
+
+const submitGeneralComment = async () => {
+  if (!generalCommentText.value.trim()) {
+    showToast("Введіть текст коментаря", "warning");
+    return;
+  }
+  if (!userStore.isAuthorized || !userStore.token) {
+    showToast("Для коментарів потрібна авторизація", "warning");
+    return;
+  }
+  try {
+    await api.post(`/stories/${storyId.value}/chapters/${chapterIndex.value}/comments`, { selectedText: "", text: generalCommentText.value });
+    generalCommentText.value = "";
+    await loadComments();
+    showToast("Коментар додано!", "success");
+  } catch (e) {
+    console.error(e);
+    showToast("Помилка при додаванні коментаря", "error");
+  }
 };
 
 const submitComment = async () => {
@@ -400,6 +435,22 @@ const formatDate = (date: string | Date | undefined) => {
   box-sizing: border-box;
 }
 .comment-textarea:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1); }
+
+/* General Comment Form */
+.general-comment-form {
+  background: white;
+  border-radius: 12px;
+  padding: 32px 40px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 32px;
+}
+.general-comment-form h3 {
+  margin: 0 0 16px;
+  color: #333;
+}
+.general-comment-actions {
+  margin-top: 12px;
+}
 
 /* Comments section */
 .comments-section {

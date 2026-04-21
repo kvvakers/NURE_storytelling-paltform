@@ -56,6 +56,12 @@ const routes = [
     name: RouteName.REGISTER,
     component: () => import("../views/Register.vue"),
   },
+  {
+    path: "/notifications",
+    name: RouteName.NOTIFICATIONS,
+    component: () => import("../views/Notifications.vue"),
+    meta: { requiresAuth: true },
+  },
 ];
 
 const router = createRouter({

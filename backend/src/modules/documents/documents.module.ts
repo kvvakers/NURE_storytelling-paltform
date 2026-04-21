@@ -10,6 +10,8 @@ import {
   DocumentContent,
   DocumentContentSchema,
 } from '../../models/entities/mongo/document-content.schema';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import {
       { name: DocumentContent.name, schema: DocumentContentSchema },
     ]),
     AuthModule,
+    NotificationsModule,
+    SubscriptionsModule,
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService],

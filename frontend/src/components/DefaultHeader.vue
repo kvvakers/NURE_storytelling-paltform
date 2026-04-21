@@ -2,10 +2,10 @@
   <header class="header">
     <div class="header-container _container _flex _ai-c _jc-sb">
       <div class="_flex _flex-full _gap-x-32">
-        <div class="logo _flex _ai-c _gap-8 _shrink-0">
+        <RouterLink to="/"  class="logo _flex _ai-c _gap-8 _shrink-0">
           <img src="../assets/logo.svg" alt="Logo" class="logo-img" />
           <span class="logo-text">Storytelling</span>
-        </div>
+        </RouterLink>
 
         <div class="search-bar _flex _ai-c _flex-full">
           <input
@@ -22,6 +22,11 @@
         <button class="btn btn-secondary" @click="handleWrite">Написати</button>
         <button class="btn btn-secondary" @click="showLogoutModal = true">Вихід</button>
         <RouterLink :to="{ name: RouteName.MY_PROFILE }" class="profile _flex _ai-c">
+          
+        <RouterLink :to="{ name: RouteName.NOTIFICATIONS }" class="notif-bell" title="Сповіщення">
+          <span class="bell-icon">🔔</span>
+          <span v-if="unreadCount > 0" class="badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+        </RouterLink>
           <div class="profile-img">
             <img :src="resolveMedia(userStore.user?.avatar)" alt="Avatar">
           </div>
@@ -53,16 +58,47 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { ref, watch, onMounted, onUnmounted } from "vue";
+import { useRouter, useRoute } from "vue-router";
 import { RouteName } from "../router/keys";
 import { useUserStore } from "../stores/user";
 import { resolveMedia } from "../utils/resolveMedia";
+import { api } from "../utils/api";
 
 const userStore = useUserStore();
 const searchQuery = ref("");
 const router = useRouter();
+const route = useRoute();
 const showLogoutModal = ref(false);
+const unreadCount = ref(0);
+let pollInterval: ReturnType<typeof setInterval> | null = null;
+
+const fetchUnreadCount = async () => {
+  if (!userStore.isAuthorized) { unreadCount.value = 0; return; }
+  try {
+    const data = await api.get('/notifications/unread-count');
+    unreadCount.value = data?.count ?? 0;
+  } catch {
+    unreadCount.value = 0;
+  }
+};
+
+onMounted(() => {
+  fetchUnreadCount();
+  pollInterval = setInterval(fetchUnreadCount, 30_000);
+});
+
+onUnmounted(() => {
+  if (pollInterval) clearInterval(pollInterval);
+});
+
+watch(() => userStore.isAuthorized, (authorized) => {
+  if (authorized) fetchUnreadCount();
+  else unreadCount.value = 0;
+});
+
+watch(() => route.fullPath, fetchUnreadCount);
+
 const search = () => {
   if (searchQuery.value.trim()) {
     router.push({ name: RouteName.SEARCH, params: { query: searchQuery.value.trim() } });
@@ -138,5 +174,42 @@ const confirmLogout = () => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* Notification bell */
+.notif-bell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.notif-bell:hover {
+  background: #f0f0f0;
+}
+.bell-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+.badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: #e53935;
+  color: white;
+  font-size: 0.6rem;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
 }
 </style>

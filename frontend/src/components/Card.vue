@@ -6,7 +6,13 @@
       <h2 class="title">{{ story.title }}</h2>
 
       <div class="meta _flex _flex-wrap _gap-10">
-        <span><b>Автор:</b> {{ story.author }}</span>
+        <span>
+          <b>Автор:</b>
+          <span
+            :class="{ 'author-link': story.ownerId }"
+            @click.prevent.stop="story.ownerId && router.push({ name: RouteName.PROFILE, params: { id: story.ownerId } })"
+          >{{ story.author }}</span>
+        </span>
         <span><b>Рейтинг:</b> {{ story.rating }}/10</span>
         <span><b>Дата:</b> {{ formatDate(story.created_at) }}</span>
       </div>
@@ -25,9 +31,12 @@
 </template>
 
 <script setup>
+import { useRouter } from "vue-router";
 import { RouteName } from "../router/keys";
 import { formatDate } from "../utils/formatDate";
 import { resolveMedia } from "../utils/resolveMedia";
+
+const router = useRouter();
 
 defineProps({
   story: {
@@ -63,6 +72,14 @@ defineProps({
 .meta {
   font-size: 13px;
   color: #666;
+}
+.author-link {
+  color: var(--color-primary);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.author-link:hover {
+  opacity: 0.8;
 }
 .description {
   font-size: 14px;

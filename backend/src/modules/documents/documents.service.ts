@@ -21,6 +21,8 @@ import {
   DocumentContent,
   DocumentContentDocument,
 } from '../../models/entities/mongo/document-content.schema';
+import { NotificationsService } from '../notifications/notifications.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 interface UpdateChapterDto {
   title?: string;
@@ -36,6 +38,8 @@ export class DocumentsService {
     private readonly userRepository: Repository<User>,
     @InjectModel(DocumentContent.name)
     private readonly documentContentModel: Model<DocumentContentDocument>,
+    private readonly notificationsService: NotificationsService,
+    private readonly subscriptionsService: SubscriptionsService,
   ) {}
 
   async createStory(createStoryDto: CreateStoryDto, ownerId?: number) {
@@ -292,6 +296,20 @@ export class DocumentsService {
       );
     }
 
+    // Notify story owner (if commenter is not the owner)
+    const meta = await this.documentMetaRepository.findOne({ where: { id: storyId } });
+    if (meta?.ownerId && meta.ownerId !== authorId) {
+      const commenter = await this.userRepository.findOne({ where: { id: authorId } });
+      const commenterName = commenter ? (commenter.username || commenter.email) : 'Читач';
+      await this.notificationsService.createNotification({
+        userId: meta.ownerId,
+        type: 'comment',
+        message: `${commenterName} залишив коментар на главу ${chapterIndex + 1} вашої історії «${meta.title}»`,
+        storyId,
+        chapterIndex,
+      });
+    }
+
     return comment;
   }
 
@@ -400,6 +418,23 @@ export class DocumentsService {
       );
     }
 
+    // Notify comment author (if replier is not the same person)
+    const chapter = result.chapters[chapterIndex];
+    const originalComment = chapter?.comments?.find((c) => c.id === commentId);
+    if (originalComment?.authorId && originalComment.authorId !== authorId) {
+      const replier = await this.userRepository.findOne({ where: { id: authorId } });
+      const meta = await this.documentMetaRepository.findOne({ where: { id: storyId } });
+      const replierName = replier ? (replier.username || replier.email) : 'Читач';
+      const storyTitle = meta?.title ?? 'невідома історія';
+      await this.notificationsService.createNotification({
+        userId: originalComment.authorId,
+        type: 'reply',
+        message: `${replierName} відповів на ваш коментар у главі ${chapterIndex + 1} історії «${storyTitle}»`,
+        storyId,
+        chapterIndex,
+      });
+    }
+
     return reply;
   }
 
@@ -439,11 +474,30 @@ export class DocumentsService {
     content.chapters.push(newChapter);
     await content.save();
 
-    const chapterIndex = content.chapters.length - 1;
+    const newChapterIndex = content.chapters.length - 1;
+
+    // Notify followers of the author
+    if (meta.ownerId) {
+      const author = await this.userRepository.findOne({ where: { id: meta.ownerId } });
+      const authorName = author ? (author.username || author.email) : 'Автор';
+      const followerIds = await this.subscriptionsService.getFollowerIds(meta.ownerId);
+      await Promise.all(
+        followerIds.map((fid) =>
+          this.notificationsService.createNotification({
+            userId: fid,
+            type: 'new_chapter',
+            message: `${authorName} додав нову главу до історії «${meta.title}»`,
+            storyId,
+            chapterIndex: newChapterIndex,
+          }),
+        ),
+      );
+    }
+
     return {
       id: storyId,
-      chapterIndex,
-      chapter: content.chapters[chapterIndex],
+      chapterIndex: newChapterIndex,
+      chapter: content.chapters[newChapterIndex],
     };
   }
 

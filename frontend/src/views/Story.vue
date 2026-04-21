@@ -8,7 +8,15 @@
         </div>
         <div class="story-info">
           <h1 class="_h1">{{ story.title }}</h1>
-          <p><b>Автор:</b> {{ story.author }}</p>
+          <p>
+            <b>Автор:</b>
+            <span
+              v-if="story.ownerId"
+              class="author-link"
+              @click="router.push({ name: RouteName.PROFILE, params: { id: story.ownerId } })"
+            >{{ story.author }}</span>
+            <span v-else>{{ story.author }}</span>
+          </p>
           <p><b>Опис:</b> {{ story.description }}</p>
           <p><b>Рейтинг:</b> {{ story.rating }}/10</p>
           <p><b>Дата публікації:</b> {{ new Date(story.createdAt).toLocaleDateString('uk-UA') }}</p>
@@ -367,6 +375,15 @@ const stripHtml = (html: string) => {
 </script>
 
 <style scoped>
+.author-link {
+  color: var(--color-primary);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.author-link:hover {
+  opacity: 0.8;
+}
+
 .story-page {
   padding: 40px 0;
   min-height: 100vh;
