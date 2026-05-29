@@ -14,6 +14,9 @@ export class LibraryItem {
   @Column({ type: 'int', nullable: true })
   categoryId: number | null;
 
+  @Column({ type: 'int', nullable: true })
+  bookmarkChapterIndex: number | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }

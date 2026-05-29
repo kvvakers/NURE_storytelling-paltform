@@ -22,6 +22,16 @@
           >
             Наступна<ChevronRight :size="16" />
           </button>
+          <button
+            v-if="userStore.isAuthorized && !isMine"
+            class="btn _flex _ai-c _gap-6"
+            :class="isBookmarked ? 'btn-bookmarked' : 'btn-secondary'"
+            :title="isBookmarked ? 'Закладка встановлена' : 'Поставити закладку'"
+            @click="toggleBookmark"
+          >
+            <BookmarkCheck v-if="isBookmarked" :size="16" />
+            <Bookmark v-else :size="16" />
+          </button>
         </div>
       </div>
 
@@ -149,7 +159,7 @@ import { useUserStore } from "../stores/user";
 import { useToast } from "../composables/useToast";
 import { RouteName } from "../router/keys";
 import { api } from '../utils/api';
-import { ArrowLeft, ChevronLeft, ChevronRight, MessageSquare } from "lucide-vue-next";
+import { ArrowLeft, Bookmark, BookmarkCheck, ChevronLeft, ChevronRight, MessageSquare } from "lucide-vue-next";
 
 interface Reply {
   id?: string;
@@ -187,6 +197,9 @@ const storyId = computed(() => Number(route.params.id));
 const chapterIndex = computed(() => Number(route.params.chapterIndex));
 const totalChapters = ref(0);
 const chapter = ref<Chapter | null>(null);
+const isMine = ref(false);
+const bookmarkChapterIndex = ref<number | null>(null);
+const isBookmarked = computed(() => bookmarkChapterIndex.value === chapterIndex.value);
 
 const comments = ref<Comment[]>([]);
 const selectedText = ref("");
@@ -202,18 +215,33 @@ const chapterTextRef = ref<HTMLElement | null>(null);
 const loadChapter = async () => {
   chapter.value = null;
   try {
-    const headers: Record<string, string> = {};
-    if (userStore.isAuthorized && userStore.token) {
-      headers.Authorization = `Bearer ${userStore.token}`;
-    }
     const data = await api.get(`/stories/${storyId.value}`);
     totalChapters.value = (data.chapters || []).length;
     chapter.value = data.chapters?.[chapterIndex.value] ?? null;
     expandedReplyIndex.value = -1;
-    // load persisted comments from backend
+    isMine.value = !!data.isMine;
+    if (userStore.isAuthorized && !data.isMine) {
+      try {
+        const status = await api.get(`/library/check/${storyId.value}`);
+        bookmarkChapterIndex.value = status.bookmarkChapterIndex ?? null;
+      } catch { /* ignore */ }
+    } else {
+      bookmarkChapterIndex.value = null;
+    }
     await loadComments();
   } catch (e) {
     console.error(e);
+  }
+};
+
+const toggleBookmark = async () => {
+  if (!userStore.isAuthorized || isMine.value) return;
+  try {
+    const res = await api.patch(`/library/${storyId.value}/bookmark`, { chapterIndex: chapterIndex.value });
+    bookmarkChapterIndex.value = res.bookmarkChapterIndex ?? null;
+    showToast(bookmarkChapterIndex.value === chapterIndex.value ? 'Закладку встановлено' : 'Закладку знято', 'success');
+  } catch {
+    showToast('Помилка при встановленні закладки', 'error');
   }
 };
 
@@ -459,5 +487,15 @@ const formatDate = (date: string | Date | undefined) => {
 /* Footer nav */
 .read-footer {
   padding-bottom: 40px;
+}
+
+.btn-bookmarked {
+  background-color: #fef9c3;
+  color: #854d0e;
+  border: 1px solid #fde68a;
+}
+
+.btn-bookmarked:hover {
+  background-color: #fef08a;
 }
 </style>

@@ -114,7 +114,14 @@
               <div v-else class="stories-grid">
                 <div v-for="story in library.all" :key="story.id" class="story-card-wrapper">
                   <Card :story="story" />
-                  <button class="remove-from-library-btn" title="Видалити з бібліотеки" @click.prevent="removeFromLibrary(story.id)">✕</button>
+                  <div class="story-card-footer">
+                    <RouterLink
+                      v-if="story.bookmarkChapterIndex != null"
+                      :to="{ name: RouteName.READ_CHAPTER, params: { id: story.id, chapterIndex: story.bookmarkChapterIndex } }"
+                      class="continue-reading-btn"
+                    >▶ Продовжити читання</RouterLink>
+                    <button class="remove-from-library-btn" title="Видалити з бібліотеки" @click.prevent="removeFromLibrary(story.id)">✕</button>
+                  </div>
                 </div>
               </div>
             </template>
@@ -130,7 +137,10 @@
                   <div v-else class="stories-grid">
                     <div v-for="story in cat.stories" :key="story.id" class="story-card-wrapper">
                       <Card :story="story" />
-                      <button class="remove-from-library-btn" title="Видалити з бібліотеки" @click.prevent="removeFromLibrary(story.id)">✕</button>
+                      <div class="story-card-footer">
+                        <span></span>
+                        <button class="remove-from-library-btn" title="Видалити з бібліотеки" @click.prevent="removeFromLibrary(story.id)">✕</button>
+                      </div>
                     </div>
                   </div>
                 </template>
@@ -716,26 +726,46 @@ async function saveProfile() {
 }
 
 .remove-from-library-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   border: none;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  font-size: 13px;
+  background: #fee2e2;
+  color: #dc2626;
+  font-size: 12px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   opacity: 0;
   transition: opacity 0.15s;
-  z-index: 2;
 }
 
 .story-card-wrapper:hover .remove-from-library-btn {
   opacity: 1;
+}
+
+.story-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 4px;
+}
+
+.continue-reading-btn {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-primary, #4f46e5);
+  text-decoration: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  transition: background 0.15s;
+}
+
+.continue-reading-btn:hover {
+  background: #dbeafe;
 }
 </style>

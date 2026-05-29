@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Request,
   UseGuards,
@@ -13,6 +14,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { LibraryService } from './library.service';
 import { CreateLibraryCategoryDto } from './dto/create-library-category.dto';
 import { AddToLibraryDto } from './dto/add-to-library.dto';
+import { SetBookmarkDto } from './dto/set-bookmark.dto';
 
 @Controller('library')
 @UseGuards(JwtAuthGuard)
@@ -56,6 +58,15 @@ export class LibraryController {
     @Request() req: any,
   ) {
     return this.libraryService.unlikeStory(storyId, req.user.userId);
+  }
+
+  @Patch(':storyId/bookmark')
+  setBookmark(
+    @Param('storyId', ParseIntPipe) storyId: number,
+    @Body() dto: SetBookmarkDto,
+    @Request() req: any,
+  ) {
+    return this.libraryService.setBookmark(storyId, req.user.userId, dto.chapterIndex);
   }
 
   @Post(':storyId')

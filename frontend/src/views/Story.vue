@@ -9,7 +9,7 @@
         <div class="story-info _flex-1">
           <h1 class="_h1">{{ story.title }}</h1>
           <p>
-            <b>Автор:</b>
+            <b>Автор: </b>
             <span
               v-if="story.ownerId"
               class="author-link"
@@ -77,9 +77,19 @@
         </div>
 
         <div v-else class="chapter-list _flex _flex-col _gap-12">
-          <div v-for="(ch, idx) in chapters" :key="idx" class="chapter-card _flex-col _ai-fs">
+          <div
+            v-for="(ch, idx) in chapters"
+            :key="idx"
+            class="chapter-card _flex-col _ai-fs"
+            :class="{ 'chapter-card--bookmarked': !story.isMine && libraryStatus.bookmarkChapterIndex === idx }"
+          >
             <div class="chapter-card-main _flex _flex-col _gap-4 _flex-1 _min-w-0" @click="goToRead(idx)">
-              <span class="chapter-number">Глава {{ idx + 1 }}</span>
+              <div class="_flex _ai-c _gap-8">
+                <span class="chapter-number">Глава {{ idx + 1 }}</span>
+                <span v-if="!story.isMine && libraryStatus.bookmarkChapterIndex === idx" class="bookmark-badge">
+                  <BookmarkCheck :size="13" />Закладка
+                </span>
+              </div>
               <span class="chapter-title">{{ ch.title }}</span>
               <span class="chapter-preview">{{ stripHtml(ch.content).slice(0, 120) }}{{ ch.content.length > 120 ? '…' : '' }}</span>
             </div>
@@ -422,7 +432,7 @@ const story = ref<Story | null>(null);
 const chapters = ref<Chapter[]>([]);
 
 // Library
-const libraryStatus = ref({ inLibrary: false, liked: false, categories: [] as number[] });
+const libraryStatus = ref({ inLibrary: false, liked: false, categories: [] as number[], bookmarkChapterIndex: null as number | null });
 const likeLoading = ref(false);
 const showAddToLibraryModal = ref(false);
 const userCategories = ref<{ id: number; title: string }[]>([]);
@@ -432,7 +442,7 @@ const loadingCategories = ref(false);
 
 const loadStory = async () => {
   story.value = null;
-  libraryStatus.value = { inLibrary: false, liked: false, categories: [] };
+  libraryStatus.value = { inLibrary: false, liked: false, categories: [], bookmarkChapterIndex: null };
   const id = Number(route.params.id);
   if (!id) return;
   try {
@@ -484,7 +494,7 @@ const removeFromLibrary = async () => {
   if (!story.value) return;
   try {
     await api.del(`/library/${story.value.id}`);
-    libraryStatus.value = { inLibrary: false, liked: false, categories: [] };
+    libraryStatus.value = { inLibrary: false, liked: false, categories: [], bookmarkChapterIndex: null };
     if (story.value) story.value.likeCount = 0;
     showToast('Видалено з бібліотеки', 'success');
   } catch {
@@ -501,6 +511,7 @@ const toggleLike = async () => {
       libraryStatus.value.liked = false;
       libraryStatus.value.inLibrary = false;
       libraryStatus.value.categories = [];
+      libraryStatus.value.bookmarkChapterIndex = null;
       if (story.value) story.value.likeCount = res.likeCount ?? Math.max(0, (story.value.likeCount ?? 1) - 1);
     } else {
       const res = await api.post(`/library/${story.value.id}/like`, {});
@@ -731,6 +742,28 @@ const stripHtml = (html: string) => {
 .chapter-card:hover {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
   border-color: var(--color-primary);
+}
+
+.chapter-card--bookmarked {
+  border-color: #fde68a;
+  background-color: #fffbeb;
+}
+
+.chapter-card--bookmarked:hover {
+  border-color: #f59e0b;
+}
+
+.bookmark-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #92400e;
+  background-color: #fef3c7;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  padding: 1px 7px;
 }
 
 .chapter-card-main {
