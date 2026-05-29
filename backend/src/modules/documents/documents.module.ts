@@ -5,6 +5,8 @@ import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
 import { DocumentMeta } from '../../models/entities/postgres/document-meta.entity';
 import { User } from '../../models/entities/postgres/user.entity';
+import { Series } from '../../models/entities/postgres/series.entity';
+import { StoryLike } from '../../models/entities/postgres/story-like.entity';
 import { AuthModule } from '../auth/auth.module';
 import {
   DocumentContent,
@@ -15,7 +17,7 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([DocumentMeta, User]),
+    TypeOrmModule.forFeature([DocumentMeta, User, Series, StoryLike]),
     MongooseModule.forFeature([
       { name: DocumentContent.name, schema: DocumentContentSchema },
     ]),

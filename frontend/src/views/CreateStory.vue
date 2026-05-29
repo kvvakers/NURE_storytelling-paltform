@@ -2,7 +2,7 @@
   <div class="create-story _page">
     <div class="_container">
       <h1 class="_h1">Створити історію</h1>
-      
+
       <form @submit.prevent="submitStory" class="form panel">
         <!-- Cover Image -->
         <div class="form-group">
@@ -123,6 +123,41 @@
           </select>
         </div>
 
+        <!-- Series -->
+        <div class="form-group">
+          <div class="series-header _flex _ai-c _jc-sb">
+            <label>Серія</label>
+            <button type="button" class="btn btn-secondary btn-sm" @click="openCreateSeriesModal">
+              Створити серію
+            </button>
+          </div>
+          <div class="series-list">
+            <p v-if="seriesList.length === 0" class="series-empty">Серій поки нема</p>
+            <label
+              v-for="series in seriesList"
+              :key="series.id"
+              class="series-option _flex _ai-c"
+            >
+              <input
+                type="radio"
+                :value="series.id"
+                v-model="formData.seriesId"
+                class="radio-input"
+              />
+              <span>{{ series.title }}</span>
+            </label>
+            <label v-if="seriesList.length > 0" class="series-option _flex _ai-c">
+              <input
+                type="radio"
+                :value="null"
+                v-model="formData.seriesId"
+                class="radio-input"
+              />
+              <span class="text-muted">Без серії</span>
+            </label>
+          </div>
+        </div>
+
         <!-- Submit Button -->
         <div class="form-actions _flex _gap-12">
           <button type="submit" class="btn btn-primary btn-lg _flex-1">Опубликовать историю</button>
@@ -133,15 +168,56 @@
       </form>
     </div>
   </div>
+
+  <!-- Create Series Modal -->
+  <Teleport to="body">
+    <div v-if="showCreateSeriesModal" class="modal-overlay" @click.self="closeCreateSeriesModal">
+      <div class="modal">
+        <div class="modal-header _flex _ai-c _jc-sb">
+          <h2 class="modal-title">Нова серія</h2>
+          <button type="button" class="btn-close" @click="closeCreateSeriesModal">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="series-title">Назва серії</label>
+            <input
+              id="series-title"
+              v-model="newSeriesTitle"
+              type="text"
+              placeholder="Введіть назву серії"
+              class="form-input"
+              @keydown.enter.prevent="submitCreateSeries"
+            />
+          </div>
+        </div>
+        <div class="modal-footer _flex _gap-12 _jc-e">
+          <button type="button" class="btn btn-secondary" @click="closeCreateSeriesModal">Скасувати</button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            :disabled="isCreatingSeries || !newSeriesTitle.trim()"
+            @click="submitCreateSeries"
+          >
+            {{ isCreatingSeries ? 'Створення...' : 'Створити' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { RouteName } from "../router/keys";
 import { useToast } from "../composables/useToast";
 import { api } from "../utils/api";
 import { resolveMedia } from "../utils/resolveMedia";
+
+interface SeriesItem {
+  id: number;
+  title: string;
+}
 
 const router = useRouter();
 const { show: showToast } = useToast();
@@ -167,22 +243,58 @@ const formData = ref({
   genres: [] as string[],
   tags: "",
   language: "",
-  cover: ""
+  cover: "",
+  seriesId: null as number | null,
 });
 
 const parsedTags = ref<string[]>([]);
-
 const isUploadingCover = ref(false);
+
+const seriesList = ref<SeriesItem[]>([]);
+const showCreateSeriesModal = ref(false);
+const newSeriesTitle = ref("");
+const isCreatingSeries = ref(false);
+
+onMounted(async () => {
+  try {
+    seriesList.value = await api.get("/series");
+  } catch {
+    // not authenticated or error — leave list empty
+  }
+});
+
+const openCreateSeriesModal = () => {
+  newSeriesTitle.value = "";
+  showCreateSeriesModal.value = true;
+};
+
+const closeCreateSeriesModal = () => {
+  showCreateSeriesModal.value = false;
+};
+
+const submitCreateSeries = async () => {
+  if (!newSeriesTitle.value.trim()) return;
+  isCreatingSeries.value = true;
+  try {
+    const created: SeriesItem = await api.post("/series", { title: newSeriesTitle.value.trim() });
+    seriesList.value.push(created);
+    formData.value.seriesId = created.id;
+    closeCreateSeriesModal();
+    showToast("Серію створено", "success");
+  } catch {
+    showToast("Помилка при створенні серії", "error");
+  } finally {
+    isCreatingSeries.value = false;
+  }
+};
 
 const handleImageUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement;
   const file = target.files?.[0];
   if (!file) return;
 
-  // Show local preview immediately
   previewImage.value = URL.createObjectURL(file);
 
-  // Upload to server
   isUploadingCover.value = true;
   try {
     const formData2 = new FormData();
@@ -222,7 +334,7 @@ const removeTag = (tag: string) => {
 
 const submitStory = async () => {
   updateTags();
-  
+
   if (!formData.value.title.trim()) {
     showToast("Будь ласка, введіть назву", "warning");
     return;
@@ -244,7 +356,7 @@ const submitStory = async () => {
   }
 
   try {
-    const storyPayload = {
+    const storyPayload: Record<string, any> = {
       title: formData.value.title,
       description: formData.value.description,
       characters: formData.value.characters,
@@ -253,6 +365,10 @@ const submitStory = async () => {
       language: formData.value.language,
       cover: formData.value.cover,
     };
+
+    if (formData.value.seriesId !== null) {
+      storyPayload.seriesId = formData.value.seriesId;
+    }
 
     router.push({
       name: RouteName.WRITE_CHAPTER,
@@ -427,6 +543,112 @@ h1 {
   margin-top: 32px;
 }
 
+/* Series */
+.series-header {
+  margin-bottom: 8px;
+}
+
+.series-header label {
+  margin-bottom: 0;
+}
+
+.series-list {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.series-empty {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.series-option {
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.2s ease;
+  gap: 10px;
+}
+
+.series-option:hover {
+  background-color: #f5f5f5;
+}
+
+.radio-input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: var(--color-bg, #fff);
+  border-radius: var(--radius-md, 8px);
+  padding: 24px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.16);
+}
+
+.modal-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.modal-header {
+  margin-bottom: 20px;
+}
+
+.modal-body {
+  margin-bottom: 20px;
+}
+
+.modal-body .form-group {
+  margin-bottom: 0;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  padding: 4px;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+
+.btn-close:hover {
+  color: var(--color-text);
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+
 @media (max-width: 768px) {
   .form {
     padding: 20px;
@@ -438,6 +660,10 @@ h1 {
 
   .form-actions {
     flex-direction: column;
+  }
+
+  .modal {
+    margin: 16px;
   }
 }
 </style>

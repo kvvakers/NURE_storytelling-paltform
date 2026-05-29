@@ -40,6 +40,12 @@ export class DocumentMeta {
   @Column({ type: 'int', nullable: true })
   ownerId?: number;
 
+  @Column({ type: 'int', nullable: true })
+  seriesId?: number;
+
+  @Column({ type: 'varchar', default: 'in_progress' })
+  status: string = 'in_progress';
+
   @CreateDateColumn()
   createdAt: Date;
 }

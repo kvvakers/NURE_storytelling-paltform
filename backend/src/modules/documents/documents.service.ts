@@ -15,6 +15,8 @@ import {
 import { UpdateStoryDto } from './dto/update-story.dto';
 import { DocumentMeta } from '../../models/entities/postgres/document-meta.entity';
 import { User } from '../../models/entities/postgres/user.entity';
+import { Series } from '../../models/entities/postgres/series.entity';
+import { StoryLike } from '../../models/entities/postgres/story-like.entity';
 import {
   ChapterComment,
   CommentReply,
@@ -36,6 +38,10 @@ export class DocumentsService {
     private readonly documentMetaRepository: Repository<DocumentMeta>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(Series)
+    private readonly seriesRepository: Repository<Series>,
+    @InjectRepository(StoryLike)
+    private readonly likeRepository: Repository<StoryLike>,
     @InjectModel(DocumentContent.name)
     private readonly documentContentModel: Model<DocumentContentDocument>,
     private readonly notificationsService: NotificationsService,
@@ -60,6 +66,7 @@ export class DocumentsService {
       cover: createStoryDto.cover,
       rating: 0,
       ownerId,
+      status: createStoryDto.status ?? 'in_progress',
     });
 
     const savedMeta = (await this.documentMetaRepository.save(
@@ -122,6 +129,14 @@ export class DocumentsService {
       for (const u of users) ownerMap.set(u.id, u.username || u.email);
     }
 
+    // Batch-fetch series titles
+    const seriesIds = [...new Set(metas.map((m) => m.seriesId).filter((id): id is number => id != null))];
+    const seriesMap = new Map<number, string>();
+    if (seriesIds.length > 0) {
+      const seriesList = await this.seriesRepository.findByIds(seriesIds);
+      for (const s of seriesList) seriesMap.set(s.id, s.title);
+    }
+
     return metas.map((meta) => ({
       id: meta.id,
       title: meta.title,
@@ -134,6 +149,9 @@ export class DocumentsService {
       cover: meta.cover,
       rating: meta.rating,
       ownerId: meta.ownerId,
+      seriesId: meta.seriesId ?? null,
+      seriesTitle: meta.seriesId ? (seriesMap.get(meta.seriesId) ?? null) : null,
+      status: meta.status,
       createdAt: meta.createdAt.toISOString(),
     }));
   }
@@ -150,8 +168,17 @@ export class DocumentsService {
     if (dto.tags !== undefined) meta.tags = dto.tags;
     if (dto.language !== undefined) meta.language = dto.language;
     if (dto.cover !== undefined) meta.cover = dto.cover;
+    if (dto.seriesId !== undefined) meta.seriesId = dto.seriesId ?? undefined;
+    if (dto.status !== undefined) meta.status = dto.status;
 
     await this.documentMetaRepository.save(meta);
+
+    let seriesTitle: string | null = null;
+    if (meta.seriesId) {
+      const series = await this.seriesRepository.findOne({ where: { id: meta.seriesId } });
+      seriesTitle = series?.title ?? null;
+    }
+
     return {
       id: meta.id,
       title: meta.title,
@@ -164,6 +191,9 @@ export class DocumentsService {
       cover: meta.cover,
       rating: meta.rating,
       ownerId: meta.ownerId,
+      seriesId: meta.seriesId ?? null,
+      seriesTitle,
+      status: meta.status,
       createdAt: meta.createdAt.toISOString(),
     };
   }
@@ -240,6 +270,17 @@ export class DocumentsService {
       if (owner) authorName = owner.username || owner.email;
     }
 
+    let seriesTitle: string | null = null;
+    if (meta.seriesId) {
+      const series = await this.seriesRepository.findOne({ where: { id: meta.seriesId } });
+      seriesTitle = series?.title ?? null;
+    }
+
+    const likeCount = await this.likeRepository.count({ where: { storyId: id } });
+    const isLiked = userId != null
+      ? !!(await this.likeRepository.findOne({ where: { storyId: id, userId } }))
+      : false;
+
     return {
       id: meta.id,
       title: meta.title,
@@ -251,10 +292,15 @@ export class DocumentsService {
       language: meta.language,
       cover: meta.cover,
       rating: meta.rating,
+      seriesId: meta.seriesId ?? null,
+      seriesTitle,
+      status: meta.status,
       createdAt: meta.createdAt.toISOString(),
       chapters: content?.chapters || [],
       ownerId: meta.ownerId as number | undefined,
       isMine: userId != null && meta.ownerId === userId,
+      likeCount,
+      isLiked,
     };
   }
 

@@ -9,6 +9,8 @@ import { DocumentsModule } from './modules/documents/documents.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { SeriesModule } from './modules/series/series.module';
+import { LibraryModule } from './modules/library/library.module';
 
 @Module({
   imports: [
@@ -40,6 +42,8 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
     DocumentsModule,
     NotificationsModule,
     SubscriptionsModule,
+    SeriesModule,
+    LibraryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

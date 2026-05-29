@@ -19,13 +19,46 @@
           </p>
           <p><b>Опис:</b> {{ story.description }}</p>
           <p><b>Рейтинг:</b> {{ story.rating }}/10</p>
+          <p class="_flex _ai-c _gap-6">
+            <b>Вподобань:</b>
+            <Heart :size="14" class="like-icon-static" />
+            <span>{{ story.likeCount ?? 0 }}</span>
+          </p>
           <p><b>Дата публікації:</b> {{ new Date(story.createdAt).toLocaleDateString('uk-UA') }}</p>
-          <div class="genres _flex _flex-wrap _gap-8">
+          <p>
+            <b>Статус:</b>
+            <span :class="statusBadgeClass(story.status)">{{ statusLabel(story.status) }}</span>
+          </p>
+          <p v-if="story.seriesTitle"><b>Серія:</b> {{ story.seriesTitle }}</p>
+          <p v-if="story.characters"><b>Персонажі:</b> {{ story.characters }}</p>
+          <div v-if="story.genres?.length" class="meta-tags _flex _flex-wrap _gap-8">
+            <b>Жанри:</b>
             <span v-for="g in story.genres" :key="g" class="badge-primary">{{ g }}</span>
+          </div>
+          <div v-if="story.tags?.length" class="meta-tags _flex _flex-wrap _gap-8">
+            <b>Теги:</b>
+            <span v-for="t in story.tags" :key="t" class="badge-secondary">{{ t }}</span>
           </div>
           <div v-if="story.isMine" class="story-owner-actions _flex _gap-12">
             <button class="btn btn-secondary _flex _ai-c _gap-6" @click="openEditStory"><Pencil :size="15" />Редагувати</button>
             <button class="btn btn-danger _flex _ai-c _gap-6" @click="deleteStoryModal = true"><Trash2 :size="15" />Видалити</button>
+          </div>
+          <div v-else-if="userStore.isAuthorized" class="story-owner-actions _flex _gap-12">
+            <button
+              class="btn _flex _ai-c _gap-6"
+              :class="libraryStatus.liked ? 'btn-liked' : 'btn-secondary'"
+              @click="toggleLike"
+              :disabled="likeLoading"
+            >
+              <Heart :size="15" :fill="libraryStatus.liked ? 'currentColor' : 'none'" />
+              {{ libraryStatus.liked ? 'Вподобано' : 'Вподобати' }}
+            </button>
+            <button v-if="libraryStatus.inLibrary" class="btn btn-secondary _flex _ai-c _gap-6" @click="removeFromLibrary">
+              <BookmarkCheck :size="15" />В бібліотеці
+            </button>
+            <button v-else class="btn btn-secondary _flex _ai-c _gap-6" @click="openAddToLibrary">
+              <BookmarkPlus :size="15" />До бібліотеки
+            </button>
           </div>
         </div>
       </div>
@@ -148,6 +181,47 @@
               <option value="es">Español</option>
             </select>
           </div>
+          <!-- Status -->
+          <div class="form-group">
+            <label>Статус</label>
+            <select v-model="editStory.status" class="form-input">
+              <option v-for="opt in STATUS_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+            </select>
+          </div>
+          <!-- Series -->
+          <div class="form-group">
+            <div class="series-header _flex _ai-c _jc-sb">
+              <label>Серія</label>
+              <button type="button" class="btn btn-secondary btn-sm" @click="openCreateSeriesModal">
+                Створити серію
+              </button>
+            </div>
+            <div class="series-list">
+              <p v-if="editStory.seriesList.length === 0" class="series-empty">Серій поки нема</p>
+              <label
+                v-for="s in editStory.seriesList"
+                :key="s.id"
+                class="series-option _flex _ai-c"
+              >
+                <input
+                  type="radio"
+                  :value="s.id"
+                  v-model="editStory.seriesId"
+                  class="radio-input"
+                />
+                <span>{{ s.title }}</span>
+              </label>
+              <label v-if="editStory.seriesList.length > 0" class="series-option _flex _ai-c">
+                <input
+                  type="radio"
+                  :value="null"
+                  v-model="editStory.seriesId"
+                  class="radio-input"
+                />
+                <span class="text-muted">Без серії</span>
+              </label>
+            </div>
+          </div>
         </div>
 
         <div v-if="editStory.error" class="error-state">{{ editStory.error }}</div>
@@ -155,6 +229,38 @@
           <button class="btn btn-secondary" @click="editStoryModal = false" :disabled="editStory.isSaving">Скасувати</button>
           <button class="btn btn-primary" @click="saveEditStory" :disabled="editStory.isSaving || editStory.isUploadingCover">
             {{ editStory.isSaving ? 'Збереження...' : 'Зберегти' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </teleport>
+
+  <!-- Create Series Modal -->
+  <teleport to="body">
+    <div v-if="showCreateSeriesModal" class="modal-overlay" @click.self="showCreateSeriesModal = false">
+      <div class="modal">
+        <div class="modal-header _flex _ai-c _jc-sb" style="margin-bottom:16px">
+          <h3 class="modal-title" style="margin:0">Нова серія</h3>
+          <button type="button" class="btn-icon" @click="showCreateSeriesModal = false">✕</button>
+        </div>
+        <div class="form-group" style="margin-bottom:16px">
+          <label>Назва серії</label>
+          <input
+            v-model="newSeriesTitle"
+            type="text"
+            placeholder="Введіть назву серії"
+            class="form-input"
+            @keydown.enter.prevent="submitCreateSeries"
+          />
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" @click="showCreateSeriesModal = false">Скасувати</button>
+          <button
+            class="btn btn-primary"
+            :disabled="isCreatingSeries || !newSeriesTitle.trim()"
+            @click="submitCreateSeries"
+          >
+            {{ isCreatingSeries ? 'Створення...' : 'Створити' }}
           </button>
         </div>
       </div>
@@ -174,21 +280,76 @@
       </div>
     </div>
   </teleport>
+
+  <!-- Add to Library Modal -->
+  <teleport to="body">
+    <div v-if="showAddToLibraryModal" class="modal-overlay" @click.self="showAddToLibraryModal = false">
+      <div class="modal">
+        <div class="modal-header _flex _ai-c _jc-sb" style="margin-bottom:16px">
+          <h3 class="modal-title" style="margin:0">Додати до бібліотеки</h3>
+          <button type="button" class="btn-icon" @click="showAddToLibraryModal = false">✕</button>
+        </div>
+
+        <div v-if="loadingCategories" style="padding:16px 0;text-align:center;color:#888">Завантаження...</div>
+        <template v-else>
+          <div class="form-group" style="margin-bottom:16px">
+            <label>Категорія <span style="color:#aaa;font-weight:400">(необов'язково)</span></label>
+            <div v-if="userCategories.length === 0" class="library-hint">
+              <p>У вас ще немає категорій.</p>
+              <p>Книга буде додана до розділу «Всі».</p>
+              <p>
+                Категорії можна створити в
+                <router-link :to="{ name: RouteName.MY_PROFILE }" @click="showAddToLibraryModal = false" class="inline-link">профілі → Моя бібліотека</router-link>.
+              </p>
+            </div>
+            <div v-else class="category-list">
+              <label class="category-option _flex _ai-c">
+                <input type="radio" :value="null" v-model="selectedCategoryId" class="radio-input" />
+                <span class="text-muted">Без категорії</span>
+              </label>
+              <label
+                v-for="cat in userCategories"
+                :key="cat.id"
+                class="category-option _flex _ai-c"
+              >
+                <input type="radio" :value="cat.id" v-model="selectedCategoryId" class="radio-input" />
+                <span>{{ cat.title }}</span>
+              </label>
+            </div>
+          </div>
+        </template>
+
+        <div class="modal-actions">
+          <button class="btn btn-secondary" @click="showAddToLibraryModal = false">Скасувати</button>
+          <button
+            class="btn btn-primary"
+            :disabled="addingToLibrary || loadingCategories"
+            @click="submitAddToLibrary"
+          >{{ addingToLibrary ? 'Додавання...' : 'Додати' }}</button>
+        </div>
+      </div>
+    </div>
+  </teleport>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-// import { useUserStore } from "../stores/user";
+import { useUserStore } from "../stores/user";
 import { useToast } from "../composables/useToast";
 import { RouteName } from "../router/keys";
 import { api } from '../utils/api';
 import { resolveMedia } from '../utils/resolveMedia';
-import { Pencil, Trash2, Plus } from "lucide-vue-next";
+import { Pencil, Trash2, Plus, BookmarkPlus, BookmarkCheck, Heart } from "lucide-vue-next";
 
 interface Chapter {
   title: string;
   content: string;
+}
+
+interface SeriesItem {
+  id: number;
+  title: string;
 }
 
 interface Story {
@@ -200,14 +361,21 @@ interface Story {
   createdAt: string;
   cover: string;
   genres: string[];
+  tags: string[];
+  characters?: string;
   chapters: Chapter[];
   ownerId?: number;
   isMine?: boolean;
+  seriesId?: number | null;
+  seriesTitle?: string | null;
+  status?: string;
+  likeCount?: number;
+  isLiked?: boolean;
 }
 
 const route = useRoute();
 const router = useRouter();
-// const userStore = useUserStore();
+const userStore = useUserStore();
 const { show: showToast } = useToast();
 
 const deleteModal = ref({ visible: false, chapterIndex: -1, chapterTitle: "" });
@@ -226,21 +394,124 @@ const editStory = ref({
   isUploadingCover: false,
   isSaving: false,
   error: '',
+  seriesId: null as number | null,
+  seriesList: [] as SeriesItem[],
+  status: 'in_progress',
 });
+
+const STATUS_OPTIONS = [
+  { value: 'in_progress', label: 'В процесі' },
+  { value: 'completed',   label: 'Завершено' },
+  { value: 'frozen',      label: 'Заморожено' },
+] as const;
+
+const statusLabel = (s?: string) =>
+  STATUS_OPTIONS.find(o => o.value === s)?.label ?? 'В процесі';
+
+const statusBadgeClass = (s?: string) => ({
+  'badge-ongoing':   !s || s === 'in_progress',
+  'badge-completed': s === 'completed',
+  'badge-frozen':    s === 'frozen',
+});
+
+const showCreateSeriesModal = ref(false);
+const newSeriesTitle = ref('');
+const isCreatingSeries = ref(false);
 
 const story = ref<Story | null>(null);
 const chapters = ref<Chapter[]>([]);
 
+// Library
+const libraryStatus = ref({ inLibrary: false, liked: false, categories: [] as number[] });
+const likeLoading = ref(false);
+const showAddToLibraryModal = ref(false);
+const userCategories = ref<{ id: number; title: string }[]>([]);
+const selectedCategoryId = ref<number | null>(null);
+const addingToLibrary = ref(false);
+const loadingCategories = ref(false);
+
 const loadStory = async () => {
   story.value = null;
+  libraryStatus.value = { inLibrary: false, liked: false, categories: [] };
   const id = Number(route.params.id);
   if (!id) return;
   try {
     const data = await api.get(`/stories/${id}`);
     story.value = data;
     chapters.value = data.chapters || [];
+    if (userStore.isAuthorized && !data.isMine) {
+      try {
+        libraryStatus.value = await api.get(`/library/check/${id}`);
+      } catch { /* ignore */ }
+    }
   } catch (e) {
     console.error(e);
+  }
+};
+
+const openAddToLibrary = async () => {
+  selectedCategoryId.value = null;
+  loadingCategories.value = true;
+  showAddToLibraryModal.value = true;
+  try {
+    userCategories.value = await api.get('/library/categories');
+  } catch {
+    userCategories.value = [];
+  } finally {
+    loadingCategories.value = false;
+  }
+};
+
+const submitAddToLibrary = async () => {
+  if (!story.value) return;
+  addingToLibrary.value = true;
+  try {
+    await api.post(`/library/${story.value.id}`, { categoryId: selectedCategoryId.value ?? null });
+    libraryStatus.value.inLibrary = true;
+    if (selectedCategoryId.value != null && !libraryStatus.value.categories.includes(selectedCategoryId.value)) {
+      libraryStatus.value.categories.push(selectedCategoryId.value);
+    }
+    showAddToLibraryModal.value = false;
+    showToast('Додано до бібліотеки', 'success');
+  } catch {
+    showToast('Помилка при додаванні', 'error');
+  } finally {
+    addingToLibrary.value = false;
+  }
+};
+
+const removeFromLibrary = async () => {
+  if (!story.value) return;
+  try {
+    await api.del(`/library/${story.value.id}`);
+    libraryStatus.value = { inLibrary: false, liked: false, categories: [] };
+    if (story.value) story.value.likeCount = 0;
+    showToast('Видалено з бібліотеки', 'success');
+  } catch {
+    showToast('Помилка при видаленні', 'error');
+  }
+};
+
+const toggleLike = async () => {
+  if (!story.value || likeLoading.value) return;
+  likeLoading.value = true;
+  try {
+    if (libraryStatus.value.liked) {
+      const res = await api.del(`/library/${story.value.id}/like`);
+      libraryStatus.value.liked = false;
+      libraryStatus.value.inLibrary = false;
+      libraryStatus.value.categories = [];
+      if (story.value) story.value.likeCount = res.likeCount ?? Math.max(0, (story.value.likeCount ?? 1) - 1);
+    } else {
+      const res = await api.post(`/library/${story.value.id}/like`, {});
+      libraryStatus.value.liked = true;
+      libraryStatus.value.inLibrary = true;
+      if (story.value) story.value.likeCount = res.likeCount ?? (story.value.likeCount ?? 0) + 1;
+    }
+  } catch {
+    showToast('Помилка', 'error');
+  } finally {
+    likeLoading.value = false;
   }
 };
 
@@ -260,7 +531,7 @@ const executeDeleteStory = async () => {
   }
 };
 
-const openEditStory = () => {
+const openEditStory = async () => {
   if (!story.value) return;
   editStory.value.title = story.value.title;
   editStory.value.description = story.value.description;
@@ -271,7 +542,35 @@ const openEditStory = () => {
   editStory.value.cover = story.value.cover;
   editStory.value.coverPreview = '';
   editStory.value.error = '';
+  editStory.value.seriesId = story.value.seriesId ?? null;
+  editStory.value.status = story.value.status ?? 'in_progress';
   editStoryModal.value = true;
+  try {
+    editStory.value.seriesList = await api.get('/series');
+  } catch {
+    editStory.value.seriesList = [];
+  }
+};
+
+const openCreateSeriesModal = () => {
+  newSeriesTitle.value = '';
+  showCreateSeriesModal.value = true;
+};
+
+const submitCreateSeries = async () => {
+  if (!newSeriesTitle.value.trim()) return;
+  isCreatingSeries.value = true;
+  try {
+    const created: SeriesItem = await api.post('/series', { title: newSeriesTitle.value.trim() });
+    editStory.value.seriesList.push(created);
+    editStory.value.seriesId = created.id;
+    showCreateSeriesModal.value = false;
+    showToast('Серію створено', 'success');
+  } catch {
+    showToast('Помилка при створенні серії', 'error');
+  } finally {
+    isCreatingSeries.value = false;
+  }
 };
 
 const onEditCoverChange = async (e: Event) => {
@@ -306,6 +605,8 @@ const saveEditStory = async () => {
       tags: editStory.value.tagsRaw.split(',').map(s => s.trim()).filter(Boolean),
       language: editStory.value.language,
       cover: editStory.value.cover,
+      seriesId: editStory.value.seriesId,
+      status: editStory.value.status,
     };
     const updated = await api.patch(`/stories/${story.value.id}`, payload);
     Object.assign(story.value, updated);
@@ -454,6 +755,33 @@ const stripHtml = (html: string) => {
   text-overflow: ellipsis;
 }
 
+.meta-tags { margin: 8px 0; align-items: center; }
+.meta-tags b { white-space: nowrap; }
+
+.badge-completed,
+.badge-ongoing,
+.badge-frozen {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.badge-completed { background-color: #d4edda; color: #155724; }
+.badge-ongoing   { background-color: #fff3cd; color: #856404; }
+.badge-frozen    { background-color: #e2e3e5; color: #383d41; }
+
+.badge-secondary {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  background-color: #e9ecef;
+  color: #495057;
+}
+
 .story-owner-actions { margin-top: 20px; }
 
 .modal-wide { max-width: 560px; width: 100%; }
@@ -474,6 +802,118 @@ const stripHtml = (html: string) => {
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
 }
+
+.series-header {
+  margin-bottom: 8px;
+}
+
+.series-header label {
+  margin-bottom: 0;
+}
+
+.series-list {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.series-empty {
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+  margin: 0;
+}
+
+.series-option {
+  cursor: pointer;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.2s;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.series-option:hover { background-color: #f5f5f5; }
+
+.radio-input {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.text-muted { color: var(--color-text-muted); }
+
+.btn-sm { padding: 5px 10px; font-size: 0.82rem; }
+
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  color: var(--color-text-muted);
+  padding: 2px 6px;
+  line-height: 1;
+}
+
+.btn-icon:hover { color: var(--color-text); }
+
+.btn-liked {
+  background-color: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+}
+
+.btn-liked:hover {
+  background-color: #fecaca;
+}
+
+.like-icon-static {
+  color: #dc2626;
+  flex-shrink: 0;
+}
+
+.library-hint {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  background: #fafafa;
+  font-size: 0.88rem;
+  color: #666;
+  line-height: 1.6;
+}
+
+.library-hint p { margin: 2px 0; }
+
+.inline-link {
+  color: var(--color-primary, #4f46e5);
+  text-decoration: underline;
+}
+
+.category-list {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.category-option {
+  cursor: pointer;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.2s;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.category-option:hover { background-color: #f5f5f5; }
 
 @media (max-width: 768px) {
   .story-metadata { flex-direction: column; padding: 20px; }

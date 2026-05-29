@@ -19,4 +19,6 @@ export class CreateStoryDto {
   language: string;
   cover: string;
   chapter: CreateChapterDto;
+  seriesId?: number;
+  status?: string;
 }
