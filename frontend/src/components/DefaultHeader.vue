@@ -163,7 +163,7 @@ const confirmLogout = () => {
 .search-bar {
   max-width: 600px;
   background-color: #f5f5f5;
-  border-radius: 24px;
+  border-radius: 10px;
   padding: 0.5rem 1rem;
 }
 .search-input {
