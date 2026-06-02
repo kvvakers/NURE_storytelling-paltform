@@ -15,6 +15,7 @@ import {
 } from '../../models/entities/mongo/document-content.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { CoAuthorsModule } from '../co-authors/co-authors.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
     AuthModule,
     NotificationsModule,
     SubscriptionsModule,
+    CoAuthorsModule,
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService],

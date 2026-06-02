@@ -158,6 +158,46 @@
           </div>
         </div>
 
+        <!-- Co-Authors -->
+        <div class="form-group" v-if="socialUsers.length > 0">
+          <label>Запросити співавторів</label>
+          <p class="hint-text">Оберіть користувачів зі своїх підписок чи підписників, яких хочете запросити як співавторів.</p>
+          <div class="coauthor-search">
+            <input
+              v-model="coauthorSearch"
+              type="text"
+              placeholder="Пошук за ім'ям..."
+              class="form-input"
+            />
+          </div>
+          <div class="coauthor-list">
+            <label
+              v-for="u in filteredSocialUsers"
+              :key="u.id"
+              class="coauthor-option _flex _ai-c"
+            >
+              <input
+                type="checkbox"
+                :value="u.id"
+                v-model="selectedInvitees"
+                class="checkbox-input"
+              />
+              <img :src="resolveMedia(u.avatar) || 'https://via.placeholder.com/32'" class="coauthor-avatar" :alt="u.username || u.email" />
+              <span>{{ u.username || u.email }}</span>
+            </label>
+          </div>
+          <div v-if="selectedInvitees.length > 0" class="selected-invitees _flex _flex-wrap _gap-8">
+            <span
+              v-for="id in selectedInvitees"
+              :key="id"
+              class="badge-primary _flex _ai-c _gap-6"
+            >
+              {{ getUserName(id) }}
+              <button type="button" class="tag-remove" @click="selectedInvitees = selectedInvitees.filter(i => i !== id)">×</button>
+            </span>
+          </div>
+        </div>
+
         <!-- Submit Button -->
         <div class="form-actions _flex _gap-12">
           <button type="submit" class="btn btn-primary btn-lg _flex-1">Опубликовать историю</button>
@@ -207,21 +247,47 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
 import { RouteName } from "../router/keys";
 import { useToast } from "../composables/useToast";
 import { api } from "../utils/api";
 import { resolveMedia } from "../utils/resolveMedia";
+import { useUserStore } from "../stores/user";
 
 interface SeriesItem {
   id: number;
   title: string;
 }
 
+interface SocialUser {
+  id: number;
+  username: string | null;
+  email: string;
+  avatar?: string | null;
+}
+
 const router = useRouter();
+const userStore = useUserStore();
 const { show: showToast } = useToast();
 const previewImage = ref("");
+
+const socialUsers = ref<SocialUser[]>([]);
+const coauthorSearch = ref("");
+const selectedInvitees = ref<number[]>([]);
+
+const filteredSocialUsers = computed(() => {
+  const q = coauthorSearch.value.trim().toLowerCase();
+  if (!q) return socialUsers.value;
+  return socialUsers.value.filter(u =>
+    (u.username || u.email).toLowerCase().includes(q)
+  );
+});
+
+const getUserName = (id: number) => {
+  const u = socialUsers.value.find(u => u.id === id);
+  return u ? (u.username || u.email) : String(id);
+};
 
 const availableGenres = [
   "Драма",
@@ -260,6 +326,23 @@ onMounted(async () => {
     seriesList.value = await api.get("/series");
   } catch {
     // not authenticated or error — leave list empty
+  }
+
+  if (userStore.isAuthorized && userStore.user?.id) {
+    try {
+      const uid = userStore.user.id;
+      const [followers, following] = await Promise.all([
+        api.get(`/users/${uid}/followers`),
+        api.get(`/users/${uid}/following`),
+      ]);
+      const map = new Map<number, SocialUser>();
+      for (const u of [...(followers ?? []), ...(following ?? [])]) {
+        if (u.id !== uid) map.set(u.id, u);
+      }
+      socialUsers.value = [...map.values()];
+    } catch {
+      // not critical
+    }
   }
 });
 
@@ -370,12 +453,13 @@ const submitStory = async () => {
       storyPayload.seriesId = formData.value.seriesId;
     }
 
-    router.push({
-      name: RouteName.WRITE_CHAPTER,
-      query: {
-        storyData: JSON.stringify(storyPayload),
-      },
-    });
+    const query: Record<string, string> = {
+      storyData: JSON.stringify(storyPayload),
+    };
+    if (selectedInvitees.value.length > 0) {
+      query.invitees = selectedInvitees.value.join(',');
+    }
+    router.push({ name: RouteName.WRITE_CHAPTER, query });
   } catch (error) {
     console.error("Error submitting story:", error);
     showToast("Ошибка при переходе к написанию главы", "error");
@@ -647,6 +731,51 @@ h1 {
 .btn-sm {
   padding: 6px 12px;
   font-size: 0.85rem;
+}
+
+.hint-text {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin: 0 0 10px;
+}
+
+.coauthor-search {
+  margin-bottom: 10px;
+}
+
+.coauthor-list {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.coauthor-option {
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.2s ease;
+  gap: 10px;
+}
+
+.coauthor-option:hover {
+  background-color: #f5f5f5;
+}
+
+.coauthor-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.selected-invitees {
+  margin-top: 10px;
 }
 
 @media (max-width: 768px) {

@@ -23,13 +23,23 @@
           v-for="n in notifications"
           :key="n.id"
           class="notification-item panel _flex _ai-c _gap-16"
-          :class="{ unread: !n.read }"
-          @click="handleClick(n)"
+          :class="{ unread: !n.read, 'invite-item': n.type === 'co_author_invite' }"
+          @click="n.type !== 'co_author_invite' && handleClick(n)"
         >
-          <div class="notification-icon _shrink-0"><MessageSquare :size="22" /></div>
+          <div class="notification-icon _shrink-0">
+            <Users v-if="n.type === 'co_author_invite' || n.type === 'co_author_accepted' || n.type === 'co_author_declined'" :size="22" />
+            <MessageSquare v-else :size="22" />
+          </div>
           <div class="notification-body _flex-1">
             <p class="notification-message">{{ n.message }}</p>
             <span class="notification-date">{{ formatDate(n.createdAt) }}</span>
+            <div v-if="n.type === 'co_author_invite' && n.relatedId && !n.responded" class="invite-actions _flex _gap-8">
+              <button class="btn btn-primary btn-sm" @click.stop="respondInvite(n, true)">Прийняти</button>
+              <button class="btn btn-secondary btn-sm" @click.stop="respondInvite(n, false)">Відхилити</button>
+            </div>
+            <span v-if="n.type === 'co_author_invite' && n.responded" class="invite-responded">
+              {{ n.respondedAccepted ? 'Ви прийняли запрошення' : 'Ви відхилили запрошення' }}
+            </span>
           </div>
           <div v-if="!n.read" class="unread-dot _shrink-0"></div>
         </div>
@@ -43,7 +53,7 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { RouteName } from '../router/keys';
 import { api } from '../utils/api';
-import { MessageSquare, CheckCheck } from "lucide-vue-next";
+import { MessageSquare, CheckCheck, Users } from "lucide-vue-next";
 
 interface Notification {
   id: number;
@@ -51,8 +61,11 @@ interface Notification {
   message: string;
   storyId?: number;
   chapterIndex?: number;
+  relatedId?: number;
   read: boolean;
   createdAt: string;
+  responded?: boolean;
+  respondedAccepted?: boolean;
 }
 
 const router = useRouter();
@@ -93,6 +106,22 @@ const markAllRead = async () => {
   try {
     await api.patch('/notifications/read-all', {});
     notifications.value.forEach(n => { n.read = true; });
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+const respondInvite = async (n: Notification, accept: boolean) => {
+  if (!n.relatedId) return;
+  try {
+    const action = accept ? 'accept' : 'decline';
+    await api.patch(`/co-authors/invitations/${n.relatedId}/${action}`, {});
+    if (!n.read) {
+      await api.patch(`/notifications/${n.id}/read`, {});
+      n.read = true;
+    }
+    n.responded = true;
+    n.respondedAccepted = accept;
   } catch (e) {
     console.error(e);
   }
@@ -161,5 +190,26 @@ const formatDate = (date: string) => {
   height: 10px;
   border-radius: 50%;
   background: var(--color-primary);
+}
+
+.invite-item {
+  cursor: default;
+}
+
+.invite-actions {
+  margin-top: 10px;
+}
+
+.invite-responded {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.btn-sm {
+  padding: 5px 12px;
+  font-size: 0.85rem;
 }
 </style>

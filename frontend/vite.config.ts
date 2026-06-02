@@ -14,4 +14,10 @@ export default defineConfig({
     },
   },
   plugins: [vue()],
+  resolve: {
+    conditions: ['import', 'module', 'browser', 'default'],
+  },
+  optimizeDeps: {
+    include: ['socket.io-client'],
+  },
 })

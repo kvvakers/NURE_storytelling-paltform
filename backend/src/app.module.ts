@@ -11,6 +11,8 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { SeriesModule } from './modules/series/series.module';
 import { LibraryModule } from './modules/library/library.module';
+import { CoAuthorsModule } from './modules/co-authors/co-authors.module';
+import { CollaborationModule } from './modules/collaboration/collaboration.module';
 
 @Module({
   imports: [
@@ -44,6 +46,8 @@ import { LibraryModule } from './modules/library/library.module';
     SubscriptionsModule,
     SeriesModule,
     LibraryModule,
+    CoAuthorsModule,
+    CollaborationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

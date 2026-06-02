@@ -64,9 +64,18 @@
             <b>Теги:</b>
             <span v-for="t in story.tags" :key="t" class="badge-secondary">{{ t }}</span>
           </div>
-          <div v-if="story.isMine" class="story-owner-actions _flex _gap-12">
+          <div v-if="story.coAuthors && story.coAuthors.length > 0" class="co-authors-row">
+            <b>Співавтори:</b>
+            <span
+              v-for="ca in story.coAuthors"
+              :key="ca.id"
+              class="coauthor-chip"
+              @click="router.push({ name: RouteName.PROFILE, params: { id: ca.id } })"
+            >{{ ca.username || ca.email }}</span>
+          </div>
+          <div v-if="story.isMine || story.isCoAuthor" class="story-owner-actions _flex _gap-12">
             <button class="btn btn-secondary _flex _ai-c _gap-6" @click="openEditStory"><Pencil :size="15" />Редагувати</button>
-            <button class="btn btn-danger _flex _ai-c _gap-6" @click="deleteStoryModal = true"><Trash2 :size="15" />Видалити</button>
+            <button v-if="story.isMine" class="btn btn-danger _flex _ai-c _gap-6" @click="deleteStoryModal = true"><Trash2 :size="15" />Видалити</button>
           </div>
           <div v-else-if="userStore.isAuthorized" class="story-owner-actions _flex _gap-12">
             <button
@@ -92,7 +101,7 @@
       <div class="chapters-section panel">
         <div class="chapters-header _flex _ai-c _jc-sb">
           <h2>Глави ({{ chapters.length }})</h2>
-          <button v-if="story.isMine" type="button" class="btn btn-primary _flex _ai-c _gap-6" @click="goToAddChapter">
+          <button v-if="story.isMine || story.isCoAuthor" type="button" class="btn btn-primary _flex _ai-c _gap-6" @click="goToAddChapter">
             <Plus :size="16" />Додати главу
           </button>
         </div>
@@ -118,7 +127,7 @@
               <span class="chapter-title">{{ ch.title }}</span>
               <span class="chapter-preview">{{ stripHtml(ch.content).slice(0, 120) }}{{ ch.content.length > 120 ? '…' : '' }}</span>
             </div>
-            <div v-if="story.isMine" class="chapter-card-actions _flex _gap-8 _shrink-0 _jc-fe">
+            <div v-if="story.isMine || story.isCoAuthor" class="chapter-card-actions _flex _gap-8 _shrink-0 _jc-fe">
               <button
                 type="button"
                 class="btn btn-secondary _flex _ai-c _gap-6"
@@ -128,6 +137,7 @@
                 <Pencil :size="14" />Редагувати
               </button>
               <button
+                v-if="story.isMine"
                 type="button"
                 class="btn btn-danger _flex _ai-c _gap-6"
                 @click.stop="confirmDeleteChapter(idx)"
@@ -388,6 +398,13 @@ interface SeriesItem {
   title: string;
 }
 
+interface CoAuthorUser {
+  id: number;
+  username: string | null;
+  email: string;
+  avatar?: string | null;
+}
+
 interface Story {
   id: number;
   title: string;
@@ -402,6 +419,8 @@ interface Story {
   chapters: Chapter[];
   ownerId?: number;
   isMine?: boolean;
+  isCoAuthor?: boolean;
+  coAuthors?: CoAuthorUser[];
   seriesId?: number | null;
   seriesTitle?: string | null;
   status?: string;
@@ -867,6 +886,31 @@ const stripHtml = (html: string) => {
   font-size: 0.8rem;
   background-color: #e9ecef;
   color: #495057;
+}
+
+.co-authors-row {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.coauthor-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  background: var(--color-bg-secondary, #f0f4ff);
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  border-radius: 20px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.coauthor-chip:hover {
+  background: var(--color-primary);
+  color: #fff;
 }
 
 .story-owner-actions { margin-top: 20px; }

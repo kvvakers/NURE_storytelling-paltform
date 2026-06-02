@@ -63,16 +63,18 @@
               <span class="series-group-count">{{ group.stories.length }} {{ group.stories.length === 1 ? 'частина' : 'частин' }}</span>
             </div>
             <div class="stories-grid">
-              <div v-for="story in group.stories" :key="story.id">
+              <div v-for="story in group.stories" :key="story.id" class="story-card-wrap">
                 <Card :story="story" />
+                <span v-if="story.isCoAuthored" class="coauthor-badge">Співавтор</span>
               </div>
             </div>
           </div>
           <div v-if="standaloneStories.length > 0">
             <h4 v-if="seriesGroups.length > 0" class="standalone-title">Окремі твори</h4>
             <div class="stories-grid">
-              <div v-for="story in standaloneStories" :key="story.id">
+              <div v-for="story in standaloneStories" :key="story.id" class="story-card-wrap">
                 <Card :story="story" />
+                <span v-if="story.isCoAuthored" class="coauthor-badge">Співавтор</span>
               </div>
             </div>
           </div>
@@ -349,15 +351,22 @@ async function loadProfile() {
       profile.value = await api.get(`/users/${parsedParamId.value}`);
     }
     const ownerId = profile.value.id;
-    const [allStories, followersData, followingData] = await Promise.all([
+    const [allStories, coAuthored, followersData, followingData] = await Promise.all([
       api.get('/stories'),
+      api.get(`/users/${ownerId}/co-authored-stories`).catch(() => []),
       api.get(`/users/${ownerId}/followers`),
       api.get(`/users/${ownerId}/following`),
     ]);
-    authorStories.value = allStories.filter(s => s.ownerId === ownerId).map(story => ({
+    const ownStories = allStories.filter(s => s.ownerId === ownerId).map(story => ({
       ...story,
       created_at: story.createdAt ?? story.created_at,
     }));
+    const coAuthoredMapped = (Array.isArray(coAuthored) ? coAuthored : []).map(story => ({
+      ...story,
+      created_at: story.createdAt ?? story.created_at,
+      isCoAuthored: true,
+    }));
+    authorStories.value = [...ownStories, ...coAuthoredMapped];
     followers.value = Array.isArray(followersData) ? followersData : [];
     following.value = Array.isArray(followingData) ? followingData : [];
 
@@ -707,6 +716,24 @@ async function saveProfile() {
   font-size: 18px;
   font-weight: 700;
   color: var(--color-text);
+}
+
+.story-card-wrap {
+  position: relative;
+}
+
+.coauthor-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .avatar-preview {

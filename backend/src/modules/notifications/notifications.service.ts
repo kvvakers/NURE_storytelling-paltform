@@ -16,6 +16,7 @@ export class NotificationsService {
     message: string;
     storyId?: number;
     chapterIndex?: number;
+    relatedId?: number;
   }): Promise<Notification> {
     const notification = this.notificationRepository.create({
       userId: data.userId,
@@ -23,6 +24,7 @@ export class NotificationsService {
       message: data.message,
       storyId: data.storyId,
       chapterIndex: data.chapterIndex,
+      relatedId: data.relatedId,
       read: false,
     });
     return this.notificationRepository.save(notification);

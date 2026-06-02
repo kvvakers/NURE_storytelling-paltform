@@ -46,6 +46,9 @@ export class DocumentMeta {
   @Column({ type: 'varchar', default: 'in_progress' })
   status: string = 'in_progress';
 
+  @Column('int', { array: true, default: [] })
+  coAuthorIds: number[];
+
   @CreateDateColumn()
   createdAt: Date;
 }

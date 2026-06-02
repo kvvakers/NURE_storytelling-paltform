@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="docs-app _flex _flex-col">
     <!-- Top bar -->
     <div class="docs-topbar _flex _ai-c _jc-sb">
@@ -9,6 +9,21 @@
         </div>
       </div>
       <div class="docs-topbar-right _flex _ai-c _gap-12">
+        <!-- Collaborators presence -->
+        <div v-if="isCollaborating" class="collab-zone _flex _ai-c _gap-8">
+          <div class="collab-avatars _flex _ai-c">
+            <div
+              v-for="[uid, u] in activeUsers"
+              :key="uid"
+              class="collab-avatar"
+              :style="{ background: u.color }"
+              :title="u.userName"
+            >{{ u.userName[0]?.toUpperCase() }}</div>
+          </div>
+          <span class="collab-status" :class="socketConnected ? 'connected' : 'connecting'">
+            {{ socketConnected ? (activeUsers.size > 0 ? 'Спільне редагування' : 'Очікування...') : 'З\'єднання...' }}
+          </span>
+        </div>
         <div class="word-count-badge">Слів: {{ wordCount }} | Символів: {{ charCount }}</div>
         <button class="docs-btn-share" @click="submitChapter">{{ isEditChapterMode ? 'Зберегти зміни' : 'Опублікувати' }}</button>
       </div>
@@ -161,9 +176,13 @@
 import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useEditor, EditorContent } from "@tiptap/vue-3";
+import { Extension } from "@tiptap/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import StarterKit from "@tiptap/starter-kit";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
+import { io, type Socket } from "socket.io-client";
 import { RouteName } from "../router/keys";
 import { useUserStore } from "../stores/user";
 import { useToast } from "../composables/useToast";
@@ -174,31 +193,86 @@ const route = useRoute();
 const userStore = useUserStore();
 const { show: showToast } = useToast();
 
-// Mode: 'new-story' when storyData is passed, 'add-chapter' when storyId is passed
-const isAddChapterMode = computed(() => !!route.query.storyId && route.query.chapterIndex === undefined);
-const isEditChapterMode = computed(() => !!route.query.storyId && route.query.chapterIndex !== undefined);
-const existingStoryId = computed(() => Number(route.query.storyId) || null);
+// ─── Collaboration colours ────────────────────────────────────────────────────
+const COLLAB_COLORS = ['#E53935', '#00897B', '#1E88E5', '#F4511E', '#8E24AA', '#3949AB', '#00ACC1', '#7CB342'];
+const getUserColor = (userId: number) => COLLAB_COLORS[Math.abs(userId) % COLLAB_COLORS.length];
+
+// ─── Remote-cursors ProseMirror plugin ───────────────────────────────────────
+interface RemoteCursor { userId: number; from: number; to: number; color: string; userName: string }
+const CURSORS_KEY = new PluginKey<Map<number, RemoteCursor>>('remoteCursors');
+
+const RemoteCursorsExtension = Extension.create({
+  name: 'remoteCursors',
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: CURSORS_KEY,
+        state: {
+          init: () => new Map<number, RemoteCursor>(),
+          apply(tr, prev) {
+            const meta = tr.getMeta(CURSORS_KEY) as Map<number, RemoteCursor> | undefined;
+            return meta !== undefined ? meta : prev;
+          },
+        },
+        props: {
+          decorations(state) {
+            const cursors = CURSORS_KEY.getState(state);
+            if (!cursors?.size) return DecorationSet.empty;
+            const decos: Decoration[] = [];
+            const maxPos = state.doc.content.size;
+            cursors.forEach((cursor) => {
+              const from = Math.max(0, Math.min(cursor.from, maxPos));
+              const to   = Math.max(0, Math.min(cursor.to,   maxPos));
+              // selection highlight
+              if (from < to) {
+                decos.push(Decoration.inline(from, to, {
+                  class: 'remote-selection',
+                  style: `background:${cursor.color}33; border-bottom:2px solid ${cursor.color}`,
+                }));
+              }
+              // cursor caret widget
+              const caretPos = Math.min(from, maxPos);
+              const el = document.createElement('span');
+              el.className = 'remote-cursor-caret';
+              el.style.cssText = `border-left:2px solid ${cursor.color}; position:relative; display:inline-block; height:1.2em; margin-left:-1px; vertical-align:text-bottom; pointer-events:none;`;
+              const label = document.createElement('span');
+              label.className = 'remote-cursor-label';
+              label.textContent = cursor.userName;
+              label.style.cssText = `position:absolute; bottom:100%; left:-1px; background:${cursor.color}; color:#fff; font-size:10px; padding:1px 6px; border-radius:4px 4px 4px 0; white-space:nowrap; pointer-events:none; font-family:sans-serif; line-height:1.6;`;
+              el.appendChild(label);
+              decos.push(Decoration.widget(caretPos, el, { side: -1, key: `cur-${cursor.userId}` }));
+            });
+            try { return DecorationSet.create(state.doc, decos); } catch { return DecorationSet.empty; }
+          },
+        },
+      }),
+    ];
+  },
+});
+
+// ─── Route / mode ─────────────────────────────────────────────────────────────
+const isAddChapterMode   = computed(() => !!route.query.storyId && route.query.chapterIndex === undefined);
+const isEditChapterMode  = computed(() => !!route.query.storyId && route.query.chapterIndex !== undefined);
+const existingStoryId    = computed(() => Number(route.query.storyId) || null);
 const existingChapterIndex = computed(() => route.query.chapterIndex !== undefined ? Number(route.query.chapterIndex) : null);
 const existingStoryTitle = computed(() => (route.query.storyTitle as string) || "");
 
-interface Comment {
-  id: string;
-  selectedText: string;
-  text: string;
-}
+// ─── Collaboration state ──────────────────────────────────────────────────────
+const isCollaborating = computed(() => isEditChapterMode.value && !!existingStoryId.value && existingChapterIndex.value !== null);
+const socketConnected = ref(false);
+const activeUsers = ref(new Map<number, { userName: string; color: string }>());
+
+let socket: Socket | null = null;
+let lastLocalEdit = 0;
+let contentDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+// ─── Story / chapter data ─────────────────────────────────────────────────────
+interface Comment { id: string; selectedText: string; text: string }
 
 const storyData = ref({
-  title: "",
-  description: "",
-  characters: "",
-  genres: [] as string[],
-  tags: [] as string[],
-  language: "",
-  cover: null as File | null,
+  title: "", description: "", characters: "", genres: [] as string[], tags: [] as string[], language: "", cover: null as File | null,
 });
-
 const chapterData = ref({ title: "Глава 1", content: "" });
-
 const comments = ref<Comment[]>([]);
 const showCommentInput = ref(false);
 const pendingSelectedText = ref("");
@@ -206,19 +280,47 @@ const pendingCommentText = ref("");
 const hasSelection = ref(false);
 const isCommentMode = ref(false);
 
+// ─── Editor ───────────────────────────────────────────────────────────────────
+const remoteCursors = ref(new Map<number, RemoteCursor>());
+
 const editor = useEditor({
   extensions: [
     StarterKit,
     TextAlign.configure({ types: ["heading", "paragraph"] }),
     Underline,
+    RemoteCursorsExtension,
   ],
   content: "<p></p>",
   onUpdate({ editor }) {
     chapterData.value.content = editor.getHTML();
+    lastLocalEdit = Date.now();
+    if (isCollaborating.value && socket?.connected) {
+      if (contentDebounceTimer) clearTimeout(contentDebounceTimer);
+      contentDebounceTimer = setTimeout(() => {
+        socket?.emit('content-update', {
+          storyId: existingStoryId.value,
+          chapterIndex: existingChapterIndex.value,
+          content: editor.getHTML(),
+          userId: userStore.user?.id,
+          timestamp: Date.now(),
+        });
+      }, 500);
+    }
   },
   onSelectionUpdate({ editor }) {
     const { from, to } = editor.state.selection;
     hasSelection.value = from !== to;
+    if (isCollaborating.value && socket?.connected && userStore.user?.id) {
+      socket.emit('cursor-update', {
+        storyId: existingStoryId.value,
+        chapterIndex: existingChapterIndex.value,
+        userId: userStore.user.id,
+        from,
+        to,
+        color: getUserColor(userStore.user.id),
+        userName: userStore.user.username || userStore.user.email || 'Автор',
+      });
+    }
   },
 });
 
@@ -227,9 +329,79 @@ const wordCount = computed(() => {
   const text = editor.value.getText();
   return text.trim().split(/\s+/).filter((w) => w.length > 0).length;
 });
-
 const charCount = computed(() => editor.value?.getText().length ?? 0);
 
+// ─── Cursor decoration helper ─────────────────────────────────────────────────
+function flushCursorDecorations() {
+  if (!editor.value) return;
+  try {
+    const tr = editor.value.state.tr.setMeta(CURSORS_KEY, remoteCursors.value);
+    editor.value.view.dispatch(tr);
+  } catch { /* editor may be destroyed */ }
+}
+
+// ─── Socket lifecycle ─────────────────────────────────────────────────────────
+function initSocket() {
+  const userId = userStore.user?.id;
+  if (!userId || !existingStoryId.value || existingChapterIndex.value === null) return;
+
+  const baseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+  const color   = getUserColor(userId);
+  const userName = userStore.user?.username || userStore.user?.email || 'Автор';
+
+  socket = io(`${baseUrl}/collaboration`, { transports: ['websocket', 'polling'] });
+
+  socket.on('connect', () => {
+    socketConnected.value = true;
+    socket!.emit('join', { storyId: existingStoryId.value, chapterIndex: existingChapterIndex.value, userId, userName, color });
+  });
+
+  socket.on('disconnect', () => { socketConnected.value = false; });
+
+  socket.on('active-users', (users: Array<{ userId: number; userName: string; color: string }>) => {
+    const m = new Map<number, { userName: string; color: string }>();
+    users.forEach(u => m.set(u.userId, { userName: u.userName, color: u.color }));
+    activeUsers.value = m;
+  });
+
+  socket.on('user-joined', (data: { userId: number; userName: string; color: string }) => {
+    activeUsers.value = new Map(activeUsers.value).set(data.userId, { userName: data.userName, color: data.color });
+    showToast(`${data.userName} приєднався до редагування`, 'info');
+  });
+
+  socket.on('user-left', (data: { userId: number }) => {
+    const updated = new Map(activeUsers.value);
+    const u = updated.get(data.userId);
+    if (u) { showToast(`${u.userName} покинув редагування`, 'info'); updated.delete(data.userId); }
+    activeUsers.value = updated;
+    const newCursors = new Map(remoteCursors.value);
+    newCursors.delete(data.userId);
+    remoteCursors.value = newCursors;
+    flushCursorDecorations();
+  });
+
+  socket.on('content-updated', (data: { content: string; userId: number }) => {
+    if (data.userId === userStore.user?.id || !editor.value) return;
+    // Don't overwrite while the local user is actively typing
+    if (Date.now() - lastLocalEdit < 2000) return;
+    const current = editor.value.getHTML();
+    if (current === data.content) return;
+    const { from, to } = editor.value.state.selection;
+    editor.value.commands.setContent(data.content, false);
+    try {
+      const size = editor.value.state.doc.content.size;
+      editor.value.commands.setTextSelection({ from: Math.min(from, size - 1), to: Math.min(to, size - 1) });
+    } catch { /* position may be out of range */ }
+  });
+
+  socket.on('cursor-updated', (data: { userId: number; from: number; to: number; color: string; userName: string }) => {
+    if (data.userId === userStore.user?.id) return;
+    remoteCursors.value = new Map(remoteCursors.value).set(data.userId, data);
+    flushCursorDecorations();
+  });
+}
+
+// ─── Lifecycle ────────────────────────────────────────────────────────────────
 onMounted(() => {
   const param = route.query.storyData;
   if (param) {
@@ -239,16 +411,22 @@ onMounted(() => {
     storyData.value.title = existingStoryTitle.value;
   }
   if (isEditChapterMode.value) {
-    const title = route.query.chapterTitle as string || "";
+    const title   = route.query.chapterTitle   as string || "";
     const content = route.query.chapterContent as string || "";
-    chapterData.value.title = title;
+    chapterData.value.title   = title;
     chapterData.value.content = content;
     editor.value?.commands.setContent(content || "<p></p>");
   }
+  if (isCollaborating.value) initSocket();
 });
 
-onBeforeUnmount(() => editor.value?.destroy());
+onBeforeUnmount(() => {
+  editor.value?.destroy();
+  socket?.disconnect();
+  if (contentDebounceTimer) clearTimeout(contentDebounceTimer);
+});
 
+// ─── Editor helpers ───────────────────────────────────────────────────────────
 const applyHeading = (e: Event) => {
   const val = (e.target as HTMLSelectElement).value;
   if (val === "paragraph") editor.value?.chain().focus().setParagraph().run();
@@ -260,44 +438,42 @@ const onEditorMouseUp = () => {
   hasSelection.value = !!selection && selection.toString().trim().length > 0;
 };
 
+// ─── Comments ─────────────────────────────────────────────────────────────────
 const openCommentInput = () => {
   const selection = window.getSelection();
   if (!selection || selection.toString().trim().length === 0) return;
   pendingSelectedText.value = selection.toString().trim();
-  pendingCommentText.value = "";
-  showCommentInput.value = true;
-  isCommentMode.value = true;
+  pendingCommentText.value  = "";
+  showCommentInput.value    = true;
+  isCommentMode.value       = true;
 };
 
 const saveComment = () => {
   if (!pendingCommentText.value.trim()) return;
-  const comment: Comment = {
+  comments.value.push({
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     selectedText: pendingSelectedText.value,
     text: pendingCommentText.value.trim(),
-  };
-  comments.value.push(comment);
+  });
   cancelComment();
 };
 
 const cancelComment = () => {
-  showCommentInput.value = false;
-  isCommentMode.value = false;
+  showCommentInput.value    = false;
+  isCommentMode.value       = false;
   pendingSelectedText.value = "";
-  pendingCommentText.value = "";
+  pendingCommentText.value  = "";
 };
 
-const removeComment = (id: string) => {
-  comments.value = comments.value.filter((c) => c.id !== id);
-};
+const removeComment = (id: string) => { comments.value = comments.value.filter((c) => c.id !== id); };
 
+// ─── Submit / Save ────────────────────────────────────────────────────────────
 const submitChapter = async () => {
   if (!chapterData.value.title.trim()) { showToast("Введіть назву розділу", "warning"); return; }
   if ((editor.value?.getText() ?? "").trim().length < 100) { showToast("Розділ повинен містити щонайменше 100 символів", "warning"); return; }
   if (!userStore.isAuthorized || !userStore.token) { router.push({ name: RouteName.LOGIN }); return; }
 
   if (isEditChapterMode.value && existingStoryId.value && existingChapterIndex.value !== null) {
-    // Save edits to existing chapter
     try {
       await api.patch(`/stories/${existingStoryId.value}/chapters/${existingChapterIndex.value}`, {
         title: chapterData.value.title,
@@ -305,15 +481,11 @@ const submitChapter = async () => {
       });
       showToast("Главу збережено!", "success");
       router.push({ name: RouteName.STORY, params: { id: String(existingStoryId.value) } });
-    } catch (e) {
-      console.error(e);
-      showToast("Помилка при збереженні глави", "error");
-    }
+    } catch (e) { console.error(e); showToast("Помилка при збереженні глави", "error"); }
     return;
   }
 
   if (isAddChapterMode.value && existingStoryId.value) {
-    // Add chapter to existing story
     try {
       await api.post(`/stories/${existingStoryId.value}/chapters`, {
         title: chapterData.value.title,
@@ -322,30 +494,23 @@ const submitChapter = async () => {
       });
       showToast("Нову главу опубліковано!", "success");
       router.push({ name: RouteName.STORY, params: { id: String(existingStoryId.value) } });
-    } catch (e) {
-      console.error(e);
-      showToast("Помилка при публікації глави", "error");
-    }
+    } catch (e) { console.error(e); showToast("Помилка при публікації глави", "error"); }
     return;
   }
 
-  // Create new story with first chapter
   try {
-    const payload = {
-      ...storyData.value,
-      chapter: {
-        title: chapterData.value.title,
-        content: chapterData.value.content,
-        comments: comments.value,
-      },
-    };
+    const payload = { ...storyData.value, chapter: { title: chapterData.value.title, content: chapterData.value.content, comments: comments.value } };
     const created = await api.post(`/stories`, payload);
+
+    const inviteesParam = route.query.invitees as string | undefined;
+    if (inviteesParam) {
+      const ids = inviteesParam.split(',').map(Number).filter(Boolean);
+      await Promise.allSettled(ids.map(id => api.post(`/stories/${created.id}/co-authors/invite`, { inviteeId: id })));
+    }
+
     showToast("Історію та перший розділ опубліковано!", "success");
     router.push({ name: RouteName.STORY, params: { id: String(created.id) } });
-  } catch (e) {
-    console.error(e);
-    showToast("Помилка при публікації", "error");
-  }
+  } catch (e) { console.error(e); showToast("Помилка при публікації", "error"); }
 };
 
 const saveDraft = () => {
@@ -390,6 +555,20 @@ const goBack = () => {
 }
 .docs-btn-share:hover { background: #3367d6; }
 
+/* === Collaboration zone === */
+.collab-zone { flex-shrink: 0; }
+.collab-avatars { gap: 4px; }
+.collab-avatar {
+  width: 28px; height: 28px; border-radius: 50%; color: #fff;
+  font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+  border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.15); flex-shrink: 0;
+}
+.collab-status {
+  font-size: 11px; font-weight: 500; padding: 3px 8px; border-radius: 10px; white-space: nowrap;
+}
+.collab-status.connected { background: #e6f4ea; color: #137333; }
+.collab-status.connecting { background: #fef7e0; color: #b06000; }
+
 /* === Toolbar === */
 .docs-toolbar {
   background: #fff;
@@ -419,9 +598,7 @@ const goBack = () => {
 .tb-comment-label { font-size: 12px; font-weight: 500; }
 
 /* === Main === */
-.docs-main {
-  overflow: hidden;
-}
+.docs-main { overflow: hidden; }
 
 /* === Page area === */
 .docs-page-area { overflow-y: auto; padding: 32px 24px; background: #f1f3f4; }
@@ -448,6 +625,10 @@ const goBack = () => {
 :deep(.tiptap ul), :deep(.tiptap ol) { padding-left: 28px; margin: 6px 0; }
 :deep(.tiptap li) { margin: 3px 0; }
 
+/* === Remote cursor decorations === */
+:deep(.remote-selection) { border-radius: 2px; }
+:deep(.remote-cursor-caret) { overflow: visible; }
+
 /* === Sidebar === */
 .docs-sidebar {
   width: 300px;
@@ -457,134 +638,39 @@ const goBack = () => {
   padding: 16px 12px;
 }
 .sidebar-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #5f6368;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #e0e0e0;
+  font-size: 13px; font-weight: 600; color: #5f6368;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;
 }
 
 /* New comment input */
-.comment-new {
-  background: #fff;
-  border: 1px solid #fbbc04;
-  border-radius: 8px;
-  padding: 12px;
-  box-shadow: 0 2px 8px rgba(251, 188, 4, 0.15);
-}
-.comment-quote-preview {
-  font-size: 12px;
-  color: #5f6368;
-  font-style: italic;
-  background: #fef9e7;
-  padding: 6px 8px;
-  border-radius: 4px;
-  border-left: 3px solid #fbbc04;
-  word-break: break-word;
-  max-height: 60px;
-  overflow: hidden;
-}
-.comment-textarea {
-  border: 1px solid #dadce0;
-  border-radius: 4px;
-  padding: 8px;
-  font-size: 13px;
-  font-family: inherit;
-  resize: none;
-  outline: none;
-}
+.comment-new { background: #fff; border: 1px solid #fbbc04; border-radius: 8px; padding: 12px; box-shadow: 0 2px 8px rgba(251,188,4,.15); }
+.comment-quote-preview { font-size: 12px; color: #5f6368; font-style: italic; background: #fef9e7; padding: 6px 8px; border-radius: 4px; border-left: 3px solid #fbbc04; word-break: break-word; max-height: 60px; overflow: hidden; }
+.comment-textarea { border: 1px solid #dadce0; border-radius: 4px; padding: 8px; font-size: 13px; font-family: inherit; resize: none; outline: none; }
 .comment-textarea:focus { border-color: #1a73e8; }
-.btn-comment-cancel {
-  background: transparent;
-  border: 1px solid #dadce0;
-  border-radius: 4px;
-  padding: 5px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  font-family: inherit;
-}
+.btn-comment-cancel { background: transparent; border: 1px solid #dadce0; border-radius: 4px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: inherit; }
 .btn-comment-cancel:hover { background: #f1f3f4; }
-.btn-comment-save {
-  background: #1a73e8;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  padding: 5px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  font-family: inherit;
-}
+.btn-comment-save { background: #1a73e8; color: #fff; border: none; border-radius: 4px; padding: 5px 12px; font-size: 12px; cursor: pointer; font-family: inherit; }
 .btn-comment-save:disabled { opacity: 0.45; cursor: default; }
 .btn-comment-save:not(:disabled):hover { background: #1557b0; }
 
 /* Comment card */
-.comment-card {
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 12px;
-}
-.comment-avatar {
-  width: 24px;
-  height: 24px;
-  background: #1a73e8;
-  color: #fff;
-  border-radius: 50%;
-  font-size: 11px;
-  font-weight: 700;
-}
-.comment-author-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: #202124;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.comment-delete {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #9aa0a6;
-  padding: 2px;
-  border-radius: 3px;
-}
+.comment-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px; }
+.comment-avatar { width: 24px; height: 24px; background: #1a73e8; color: #fff; border-radius: 50%; font-size: 11px; font-weight: 700; }
+.comment-author-name { font-size: 12px; font-weight: 600; color: #202124; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comment-delete { background: none; border: none; cursor: pointer; color: #9aa0a6; padding: 2px; border-radius: 3px; }
 .comment-delete:hover { color: #d93025; background: #fce8e6; }
-.comment-quote {
-  font-size: 12px;
-  color: #5f6368;
-  font-style: italic;
-  background: #f8f9fa;
-  padding: 4px 8px;
-  border-radius: 3px;
-  border-left: 2px solid #dadce0;
-  word-break: break-word;
-}
+.comment-quote { font-size: 12px; color: #5f6368; font-style: italic; background: #f8f9fa; padding: 4px 8px; border-radius: 3px; border-left: 2px solid #dadce0; word-break: break-word; }
 .comment-text { font-size: 13px; color: #202124; line-height: 1.5; }
 
 /* === Bottom bar === */
-.docs-bottombar {
-  background: #fff; border-top: 1px solid #e0e0e0; padding: 8px 16px;
-  flex-shrink: 0; font-size: 13px; color: #5f6368;
-}
-.docs-chapter-mini {
-  border: none; border-bottom: 1px solid transparent; outline: none;
-  font-size: 13px; color: #202124; padding: 2px 4px; font-family: inherit;
-  background: transparent; max-width: 200px;
-}
+.docs-bottombar { background: #fff; border-top: 1px solid #e0e0e0; padding: 8px 16px; flex-shrink: 0; font-size: 13px; color: #5f6368; }
+.docs-chapter-mini { border: none; border-bottom: 1px solid transparent; outline: none; font-size: 13px; color: #202124; padding: 2px 4px; font-family: inherit; background: transparent; max-width: 200px; }
 .docs-chapter-mini:focus { border-bottom-color: #1a73e8; }
 .docs-story-name { color: #9aa0a6; }
-.docs-btn-secondary {
-  background: #e8f0fe; color: #1a73e8; border: none; border-radius: 4px;
-  padding: 6px 16px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit;
-}
+.docs-btn-secondary { background: #e8f0fe; color: #1a73e8; border: none; border-radius: 4px; padding: 6px 16px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; }
 .docs-btn-secondary:hover { background: #d2e3fc; }
-.docs-btn-outline {
-  background: transparent; color: #444; border: 1px solid #dadce0;
-  border-radius: 4px; padding: 6px 16px; font-size: 13px; cursor: pointer; font-family: inherit;
-}
+.docs-btn-outline { background: transparent; color: #444; border: 1px solid #dadce0; border-radius: 4px; padding: 6px 16px; font-size: 13px; cursor: pointer; font-family: inherit; }
 .docs-btn-outline:hover { background: #f1f3f4; }
 
 @media (max-width: 900px) {

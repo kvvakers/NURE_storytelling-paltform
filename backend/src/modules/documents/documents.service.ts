@@ -311,7 +311,7 @@ export class DocumentsService {
       throw new NotFoundException(`Story with id ${id} not found`);
     }
 
-    if (userId == null || meta.ownerId !== userId) {
+    if (userId == null || (meta.ownerId !== userId && !(meta.coAuthorIds ?? []).includes(userId))) {
       throw new ForbiddenException('You are not allowed to edit this chapter');
     }
 
@@ -372,6 +372,13 @@ export class DocumentsService {
 
     const ratingCount = await this.ratingRepository.count({ where: { storyId: id } });
 
+    const isCoAuthor = userId != null && (meta.coAuthorIds ?? []).includes(userId);
+    let coAuthors: { id: number; username: string | null; email: string; avatar?: string | null }[] = [];
+    if ((meta.coAuthorIds ?? []).length > 0) {
+      const coAuthorUsers = await this.userRepository.findByIds(meta.coAuthorIds);
+      coAuthors = coAuthorUsers.map(u => ({ id: u.id, username: u.username, email: u.email, avatar: u.avatar }));
+    }
+
     return {
       id: meta.id,
       title: meta.title,
@@ -391,6 +398,8 @@ export class DocumentsService {
       chapters: content?.chapters || [],
       ownerId: meta.ownerId as number | undefined,
       isMine: userId != null && meta.ownerId === userId,
+      isCoAuthor,
+      coAuthors,
       likeCount,
       isLiked,
     };
@@ -399,7 +408,7 @@ export class DocumentsService {
   async rateStory(storyId: number, userId: number, rating: number) {
     const meta = await this.documentMetaRepository.findOne({ where: { id: storyId } });
     if (!meta) throw new NotFoundException(`Story ${storyId} not found`);
-    if (meta.ownerId === userId) {
+    if (meta.ownerId === userId || (meta.coAuthorIds ?? []).includes(userId)) {
       throw new ForbiddenException('Authors cannot rate their own stories');
     }
 
@@ -624,7 +633,7 @@ export class DocumentsService {
       throw new NotFoundException(`Story with id ${storyId} not found`);
     }
 
-    if (userId == null || meta.ownerId !== userId) {
+    if (userId == null || (meta.ownerId !== userId && !(meta.coAuthorIds ?? []).includes(userId))) {
       throw new ForbiddenException(
         'You are not allowed to add chapters to this story',
       );

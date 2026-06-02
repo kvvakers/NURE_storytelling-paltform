@@ -26,6 +26,9 @@ export class Notification {
   @Column({ type: 'int', nullable: true })
   chapterIndex?: number;
 
+  @Column({ type: 'int', nullable: true })
+  relatedId?: number;
+
   @Column({ default: false })
   read: boolean;
 
