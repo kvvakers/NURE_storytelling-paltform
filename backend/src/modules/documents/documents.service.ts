@@ -103,23 +103,52 @@ export class DocumentsService {
     };
   }
 
-  async getAllStories(searchQuery?: string) {
-    let metas: DocumentMeta[];
+  async getAllStories(filters: {
+    query?: string;
+    genres?: string[];
+    tags?: string[];
+    status?: string;
+    language?: string;
+  } = {}) {
+    let qb = this.documentMetaRepository
+      .createQueryBuilder('meta')
+      .orderBy('meta.createdAt', 'DESC');
 
-    if (!searchQuery || !searchQuery.trim()) {
-      metas = await this.documentMetaRepository.find({
-        order: { createdAt: 'DESC' },
-      });
-    } else {
-      const normalizedQuery = `%${searchQuery.toLowerCase()}%`;
-      metas = await this.documentMetaRepository
-        .createQueryBuilder('meta')
-        .where('LOWER(meta.title) LIKE :query', { query: normalizedQuery })
-        .orWhere('LOWER(meta.description) LIKE :query', { query: normalizedQuery })
-        .orWhere('LOWER(meta.author) LIKE :query', { query: normalizedQuery })
-        .orderBy('meta.createdAt', 'DESC')
-        .getMany();
+    if (filters.query?.trim()) {
+      const q = `%${filters.query.toLowerCase()}%`;
+      qb = qb.andWhere(
+        '(LOWER(meta.title) LIKE :q OR LOWER(meta.description) LIKE :q OR LOWER(meta.author) LIKE :q)',
+        { q },
+      );
     }
+
+    if (filters.genres?.length) {
+      const genreParams: Record<string, string> = {};
+      const genreConditions = filters.genres.map((g, i) => {
+        genreParams[`genre${i}`] = g;
+        return `:genre${i} = ANY(meta.genres)`;
+      });
+      qb = qb.andWhere(`(${genreConditions.join(' OR ')})`, genreParams);
+    }
+
+    if (filters.tags?.length) {
+      const tagParams: Record<string, string> = {};
+      const tagConditions = filters.tags.map((t, i) => {
+        tagParams[`tag${i}`] = t.trim();
+        return `:tag${i} = ANY(meta.tags)`;
+      });
+      qb = qb.andWhere(`(${tagConditions.join(' OR ')})`, tagParams);
+    }
+
+    if (filters.status) {
+      qb = qb.andWhere('meta.status = :status', { status: filters.status });
+    }
+
+    if (filters.language) {
+      qb = qb.andWhere('meta.language = :language', { language: filters.language });
+    }
+
+    const metas = await qb.getMany();
 
     // Batch-fetch owners to get up-to-date usernames
     const ownerIds = [...new Set(metas.map((m) => m.ownerId).filter((id): id is number => id != null))];

@@ -54,8 +54,20 @@ export class DocumentsController {
 
   @UseGuards(OptionalJwtAuthGuard)
   @Get()
-  findAll(@Query('query') query?: string) {
-    return this.documentsService.getAllStories(query);
+  findAll(
+    @Query('query') query?: string,
+    @Query('genres') genres?: string,
+    @Query('tags') tags?: string,
+    @Query('status') status?: string,
+    @Query('language') language?: string,
+  ) {
+    return this.documentsService.getAllStories({
+      query,
+      genres: genres ? genres.split(',') : undefined,
+      tags: tags ? tags.split(',') : undefined,
+      status: status || undefined,
+      language: language || undefined,
+    });
   }
 
   @UseGuards(OptionalJwtAuthGuard)

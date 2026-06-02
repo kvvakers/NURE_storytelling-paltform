@@ -1,6 +1,11 @@
 <template>
   <RouterLink :to="{ name: RouteName.STORY, params: { id: story.id } }" class="card _flex _flex-col">
-    <img :src="resolveMedia(story.cover)" :alt="story.title" class="cover" />
+    <img
+      :src="resolveMedia(story.cover) || placeholderImg"
+      @error="(e) => { e.target.src = placeholderImg; e.target.onerror = null; }"
+      :alt="story.title"
+      class="cover"
+    />
 
     <div class="info _flex _flex-col _gap-10">
       <h2 class="title">{{ story.title }}</h2>
@@ -35,6 +40,7 @@ import { useRouter } from "vue-router";
 import { RouteName } from "../router/keys";
 import { formatDate } from "../utils/formatDate";
 import { resolveMedia } from "../utils/resolveMedia";
+import placeholderImg from "../assets/placeholder.jpg";
 import { User, Star, Calendar } from "lucide-vue-next";
 
 const router = useRouter();

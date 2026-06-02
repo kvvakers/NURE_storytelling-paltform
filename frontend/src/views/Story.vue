@@ -4,7 +4,12 @@
       <!-- Story Metadata -->
       <div class="story-metadata panel _flex _gap-x-32">
         <div>
-          <img :src="resolveMedia(story.cover)" :alt="story.title" class="cover" />
+          <img
+            :src="resolveMedia(story.cover) || placeholderImg"
+            @error="(e: Event) => { const img = e.target as HTMLImageElement; img.src = placeholderImg; img.onerror = null; }"
+            :alt="story.title"
+            class="cover"
+          />
         </div>
         <div class="story-info _flex-1">
           <h1 class="_h1">{{ story.title }}</h1>
@@ -350,6 +355,7 @@ import { useToast } from "../composables/useToast";
 import { RouteName } from "../router/keys";
 import { api } from '../utils/api';
 import { resolveMedia } from '../utils/resolveMedia';
+import placeholderImg from '../assets/placeholder.jpg';
 import { Pencil, Trash2, Plus, BookmarkPlus, BookmarkCheck, Heart } from "lucide-vue-next";
 
 interface Chapter {

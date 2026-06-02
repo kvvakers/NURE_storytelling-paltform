@@ -16,7 +16,11 @@
             placeholder="Пошук історій..."
             class="search-input _flex-1"
           />
+          <button class="filter-btn" :class="{ active: showFilterSidebar }" @click="showFilterSidebar = !showFilterSidebar" title="Фільтри">
+            <SlidersHorizontal :size="18" />
+          </button>
         </div>
+        <FilterSidebar v-model="showFilterSidebar" :search-query="searchQuery" />
       </div>
 
       <div v-if="userStore.isAuthorized" class="actions _flex _gap-8 _shrink-0">
@@ -74,13 +78,15 @@ import { RouteName } from "../router/keys";
 import { useUserStore } from "../stores/user";
 import { resolveMedia } from "../utils/resolveMedia";
 import { api } from "../utils/api";
-import { Search, PenLine, LogOut, LogIn, UserPlus, Bell } from "lucide-vue-next";
+import { Search, PenLine, LogOut, LogIn, UserPlus, Bell, SlidersHorizontal } from "lucide-vue-next";
+import FilterSidebar from "./FilterSidebar.vue";
 
 const userStore = useUserStore();
 const searchQuery = ref("");
 const router = useRouter();
 const route = useRoute();
 const showLogoutModal = ref(false);
+const showFilterSidebar = ref(false);
 const unreadCount = ref(0);
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -112,7 +118,7 @@ watch(() => route.fullPath, fetchUnreadCount);
 
 const search = () => {
   if (searchQuery.value.trim()) {
-    router.push({ name: RouteName.SEARCH, params: { query: searchQuery.value.trim() } });
+    router.push({ name: RouteName.SEARCH, query: { q: searchQuery.value.trim() } });
   }
 };
 
@@ -189,6 +195,23 @@ const confirmLogout = () => {
 .search-icon {
   color: #999;
   flex-shrink: 0;
+}
+.filter-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  flex-shrink: 0;
+  transition: color 0.2s, background 0.2s;
+}
+.filter-btn:hover,
+.filter-btn.active {
+  color: var(--color-primary);
+  background: rgba(0, 123, 255, 0.08);
 }
 .notif-btn {
   position: relative;
