@@ -70,10 +70,39 @@ export class DocumentsController {
     });
   }
 
+  @Get('new')
+  getNew() {
+    return this.documentsService.getNewStories(15);
+  }
+
+  @Get('popular')
+  getPopular() {
+    return this.documentsService.getPopularStories(15);
+  }
+
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     return this.documentsService.getStoryById(id, req.user?.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/rate')
+  rateStory(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('rating', ParseIntPipe) rating: number,
+    @Request() req: any,
+  ) {
+    return this.documentsService.rateStory(id, req.user.userId, rating);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/my-rating')
+  getMyRating(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ) {
+    return this.documentsService.getMyRating(id, req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)

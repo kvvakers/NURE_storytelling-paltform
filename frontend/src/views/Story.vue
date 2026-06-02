@@ -23,7 +23,27 @@
             <span v-else>{{ story.author }}</span>
           </p>
           <p><b>Опис:</b> {{ story.description }}</p>
-          <p><b>Рейтинг:</b> {{ story.rating }}/10</p>
+          <div class="rating-row">
+            <b>Рейтинг:</b>
+            <span class="rating-value">{{ story.rating > 0 ? story.rating.toFixed(1) : '—' }}/10</span>
+            <span v-if="story.ratingCount" class="rating-count">({{ story.ratingCount }} {{ ratingCountLabel(story.ratingCount) }})</span>
+          </div>
+          <div v-if="!story.isMine && userStore.isAuthorized" class="rating-stars-row">
+            <span class="rating-label">Ваша оцінка:</span>
+            <div class="stars-input">
+              <button
+                v-for="n in 10"
+                :key="n"
+                type="button"
+                class="star-btn"
+                :class="{ active: n <= (ratingHover || userRating || 0) }"
+                @mouseenter="ratingHover = n"
+                @mouseleave="ratingHover = 0"
+                @click="submitRating(n)"
+              >★</button>
+            </div>
+            <span v-if="userRating" class="user-rating-val">{{ userRating }}/10</span>
+          </div>
           <p class="_flex _ai-c _gap-6">
             <b>Вподобань:</b>
             <Heart :size="14" class="like-icon-static" />
@@ -387,12 +407,35 @@ interface Story {
   status?: string;
   likeCount?: number;
   isLiked?: boolean;
+  ratingCount?: number;
 }
 
 const route = useRoute();
 const router = useRouter();
 const userStore = useUserStore();
 const { show: showToast } = useToast();
+
+const userRating = ref<number | null>(null);
+const ratingHover = ref(0);
+
+const ratingCountLabel = (n: number) => {
+  if (n % 10 === 1 && n % 100 !== 11) return 'оцінка';
+  if ([2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100)) return 'оцінки';
+  return 'оцінок';
+};
+
+const submitRating = async (stars: number) => {
+  if (!story.value) return;
+  try {
+    const res = await api.post(`/stories/${story.value.id}/rate`, { rating: stars });
+    userRating.value = stars;
+    story.value.rating = res.averageRating;
+    story.value.ratingCount = res.ratingCount;
+    showToast('Оцінку збережено', 'success');
+  } catch {
+    showToast('Помилка при оцінюванні', 'error');
+  }
+};
 
 const deleteModal = ref({ visible: false, chapterIndex: -1, chapterTitle: "" });
 const deleteStoryModal = ref(false);
@@ -448,6 +491,7 @@ const loadingCategories = ref(false);
 
 const loadStory = async () => {
   story.value = null;
+  userRating.value = null;
   libraryStatus.value = { inLibrary: false, liked: false, categories: [], bookmarkChapterIndex: null };
   const id = Number(route.params.id);
   if (!id) return;
@@ -458,6 +502,10 @@ const loadStory = async () => {
     if (userStore.isAuthorized && !data.isMine) {
       try {
         libraryStatus.value = await api.get(`/library/check/${id}`);
+      } catch { /* ignore */ }
+      try {
+        const ratingRes = await api.get(`/stories/${id}/my-rating`);
+        userRating.value = ratingRes.userRating;
       } catch { /* ignore */ }
     }
   } catch (e) {
@@ -913,6 +961,68 @@ const stripHtml = (html: string) => {
 .like-icon-static {
   color: #dc2626;
   flex-shrink: 0;
+}
+
+.rating-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+  color: #555;
+}
+
+.rating-value {
+  font-weight: 600;
+  color: #333;
+}
+
+.rating-count {
+  font-size: 0.85rem;
+  color: #999;
+}
+
+.rating-stars-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 12px;
+}
+
+.rating-label {
+  font-size: 0.9rem;
+  color: #555;
+  white-space: nowrap;
+}
+
+.stars-input {
+  display: flex;
+  gap: 2px;
+}
+
+.star-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.5rem;
+  color: #d1d5db;
+  padding: 0 1px;
+  line-height: 1;
+  transition: color 0.1s, transform 0.1s;
+}
+
+.star-btn:hover,
+.star-btn.active {
+  color: #f59e0b;
+}
+
+.star-btn:hover {
+  transform: scale(1.15);
+}
+
+.user-rating-val {
+  font-size: 0.88rem;
+  color: #f59e0b;
+  font-weight: 600;
 }
 
 .library-hint {

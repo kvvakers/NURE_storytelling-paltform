@@ -34,7 +34,7 @@ export class DocumentMeta {
   @Column()
   cover: string;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'float', default: 0 })
   rating: number;
 
   @Column({ type: 'int', nullable: true })

@@ -17,6 +17,7 @@ import { DocumentMeta } from '../../models/entities/postgres/document-meta.entit
 import { User } from '../../models/entities/postgres/user.entity';
 import { Series } from '../../models/entities/postgres/series.entity';
 import { StoryLike } from '../../models/entities/postgres/story-like.entity';
+import { StoryRating } from '../../models/entities/postgres/story-rating.entity';
 import {
   ChapterComment,
   CommentReply,
@@ -42,6 +43,8 @@ export class DocumentsService {
     private readonly seriesRepository: Repository<Series>,
     @InjectRepository(StoryLike)
     private readonly likeRepository: Repository<StoryLike>,
+    @InjectRepository(StoryRating)
+    private readonly ratingRepository: Repository<StoryRating>,
     @InjectModel(DocumentContent.name)
     private readonly documentContentModel: Model<DocumentContentDocument>,
     private readonly notificationsService: NotificationsService,
@@ -185,6 +188,63 @@ export class DocumentsService {
     }));
   }
 
+  async getNewStories(limit: number) {
+    const metas = await this.documentMetaRepository.find({
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+    return this.mapMetasToDto(metas);
+  }
+
+  async getPopularStories(limit: number) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 14);
+
+    const rows = await this.ratingRepository
+      .createQueryBuilder('r')
+      .select('r.storyId', 'storyId')
+      .addSelect('COUNT(r.id)', 'cnt')
+      .where('r.createdAt >= :cutoff', { cutoff })
+      .groupBy('r.storyId')
+      .orderBy('"cnt"', 'DESC')
+      .limit(limit)
+      .getRawMany<{ storyId: string; cnt: string }>();
+
+    if (rows.length === 0) return [];
+
+    const storyIds = rows.map(r => Number(r.storyId));
+    const metas = await this.documentMetaRepository.findByIds(storyIds);
+    const metaMap = new Map(metas.map(m => [m.id, m]));
+    const ordered = storyIds.map(id => metaMap.get(id)).filter((m): m is DocumentMeta => m != null);
+    return this.mapMetasToDto(ordered);
+  }
+
+  private async mapMetasToDto(metas: DocumentMeta[]) {
+    if (metas.length === 0) return [];
+
+    const ownerIds = [...new Set(metas.map(m => m.ownerId).filter((id): id is number => id != null))];
+    const ownerMap = new Map<number, string>();
+    if (ownerIds.length > 0) {
+      const users = await this.userRepository.findByIds(ownerIds);
+      for (const u of users) ownerMap.set(u.id, u.username || u.email);
+    }
+
+    return metas.map(meta => ({
+      id: meta.id,
+      title: meta.title,
+      description: meta.description,
+      author: meta.ownerId ? (ownerMap.get(meta.ownerId) ?? meta.author) : meta.author,
+      cover: meta.cover,
+      rating: meta.rating,
+      genres: meta.genres,
+      tags: meta.tags,
+      status: meta.status,
+      ownerId: meta.ownerId,
+      createdAt: meta.createdAt.toISOString(),
+      created_at: meta.createdAt.toISOString(),
+    }));
+  }
+
   async updateStory(id: number, dto: UpdateStoryDto, userId: number) {
     const meta = await this.documentMetaRepository.findOne({ where: { id } });
     if (!meta) throw new NotFoundException(`Story with id ${id} not found`);
@@ -310,6 +370,8 @@ export class DocumentsService {
       ? !!(await this.likeRepository.findOne({ where: { storyId: id, userId } }))
       : false;
 
+    const ratingCount = await this.ratingRepository.count({ where: { storyId: id } });
+
     return {
       id: meta.id,
       title: meta.title,
@@ -321,6 +383,7 @@ export class DocumentsService {
       language: meta.language,
       cover: meta.cover,
       rating: meta.rating,
+      ratingCount,
       seriesId: meta.seriesId ?? null,
       seriesTitle,
       status: meta.status,
@@ -331,6 +394,41 @@ export class DocumentsService {
       likeCount,
       isLiked,
     };
+  }
+
+  async rateStory(storyId: number, userId: number, rating: number) {
+    const meta = await this.documentMetaRepository.findOne({ where: { id: storyId } });
+    if (!meta) throw new NotFoundException(`Story ${storyId} not found`);
+    if (meta.ownerId === userId) {
+      throw new ForbiddenException('Authors cannot rate their own stories');
+    }
+
+    const existing = await this.ratingRepository.findOne({ where: { storyId, userId } });
+    if (existing) {
+      existing.rating = rating;
+      await this.ratingRepository.save(existing);
+    } else {
+      await this.ratingRepository.save(this.ratingRepository.create({ storyId, userId, rating }));
+    }
+
+    const result = await this.ratingRepository
+      .createQueryBuilder('r')
+      .select('AVG(r.rating)', 'avg')
+      .select('COUNT(r.id)', 'count')
+      .addSelect('AVG(r.rating)', 'avg')
+      .where('r.storyId = :storyId', { storyId })
+      .getRawOne<{ avg: string; count: string }>();
+
+    const average = result?.avg ? Math.round(parseFloat(result.avg) * 10) / 10 : 0;
+    meta.rating = average;
+    await this.documentMetaRepository.save(meta);
+
+    return { averageRating: average, userRating: rating, ratingCount: Number(result?.count ?? 0) };
+  }
+
+  async getMyRating(storyId: number, userId: number) {
+    const existing = await this.ratingRepository.findOne({ where: { storyId, userId } });
+    return { userRating: existing?.rating ?? null };
   }
 
   async addComment(

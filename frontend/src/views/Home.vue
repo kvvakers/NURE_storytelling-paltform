@@ -13,39 +13,15 @@
       </section>
 
       <section class="section">
-        <h2 class="_h2">Популярне</h2>
+        <h2 class="_h2">Нові історії</h2>
         <div v-if="isLoading" class="loading-state">Завантаження історій...</div>
         <div v-if="errorMessage" class="error-state">{{ errorMessage }}</div>
-        <div v-if="!isLoading && stories.length === 0" class="loading-state">Поки немає доступних історій.</div>
+        <div v-if="!isLoading && newStories.length === 0 && !errorMessage" class="loading-state">Поки немає доступних історій.</div>
         <swiper
-          v-if="stories.length > 0"
+          v-if="newStories.length > 0"
           :slides-per-view="7"
           :space-between="20"
-          :loop="true"
-          navigation
-          class="stories-swiper swiper-fade"
-        >
-          <swiper-slide v-for="story in popularStoriesRef" :key="story.id">
-            <div class="story-card panel _flex _flex-col">
-              <RouterLink :to="{name: RouteName.STORY, params: {id: story.id}}">
-                <img :src="resolveMedia(story.cover) || 'src/assets/placeholder.jpg'" alt="cover" />
-                <div class="story-card-info">
-                  <h3>{{ story.title }}</h3>
-                  <p>{{ story.author || 'Автор не вказаний' }}</p>
-                  <p>{{ new Date(story.created_at).toLocaleDateString() }}</p>
-                </div>
-              </RouterLink>
-            </div>
-          </swiper-slide>
-        </swiper>
-      </section>
-
-      <section v-if="stories.length > 0" class="section">
-        <h2 class="_h2">Нові історії</h2>
-        <swiper
-          :slides-per-view="7"
-          :space-between="20"
-          :loop="true"
+          :loop="newStories.length >= 7"
           navigation
           class="stories-swiper swiper-fade"
         >
@@ -56,7 +32,34 @@
                 <div class="story-card-info">
                   <h3>{{ story.title }}</h3>
                   <p>{{ story.author || 'Автор не вказаний' }}</p>
-                  <p>{{ new Date(story.created_at).toLocaleDateString('uk-UA') }}</p>
+                  <p>{{ new Date(story.createdAt).toLocaleDateString('uk-UA') }}</p>
+                </div>
+              </RouterLink>
+            </div>
+          </swiper-slide>
+        </swiper>
+      </section>
+
+      <section class="section">
+        <h2 class="_h2">Популярне</h2>
+        <div v-if="isLoading" class="loading-state">Завантаження...</div>
+        <div v-if="!isLoading && popularStories.length === 0 && !errorMessage" class="loading-state">Немає популярних за останні 2 тижні.</div>
+        <swiper
+          v-if="popularStories.length > 0"
+          :slides-per-view="7"
+          :space-between="20"
+          :loop="popularStories.length >= 7"
+          navigation
+          class="stories-swiper swiper-fade"
+        >
+          <swiper-slide v-for="story in popularStories" :key="story.id">
+            <div class="story-card panel _flex _flex-col">
+              <RouterLink :to="{name: RouteName.STORY, params: {id: story.id}}">
+                <img :src="resolveMedia(story.cover) || 'src/assets/placeholder.jpg'" alt="cover" />
+                <div class="story-card-info">
+                  <h3>{{ story.title }}</h3>
+                  <p>{{ story.author || 'Автор не вказаний' }}</p>
+                  <p>{{ new Date(story.createdAt).toLocaleDateString('uk-UA') }}</p>
                 </div>
               </RouterLink>
             </div>
@@ -68,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { onMounted, ref } from "vue";
 
 import { Swiper, SwiperSlide } from "swiper/vue";
 import "swiper/css";
@@ -85,35 +88,26 @@ interface Story {
   title: string;
   cover: string;
   rating: number;
-  created_at: string;
+  createdAt: string;
   author?: string;
 }
 
-const stories = ref<Story[]>([]);
+const newStories = ref<Story[]>([]);
+const popularStories = ref<Story[]>([]);
 const isLoading = ref(true);
 const errorMessage = ref<string | null>(null);
 
-const popularStoriesRef = computed(() => {
-  return stories.value.filter((s) => s.rating > 6).slice(0, 10);
-});
-
-const newStories = computed(() => {
-  return [...stories.value]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, 10);
-});
-
 onMounted(async () => {
   try {
-    const data = await api.get('/stories');
-    stories.value = data.map((story: any) => ({
-      ...story,
-      created_at: story.createdAt,
-    }));
+    const [newData, popularData] = await Promise.all([
+      api.get('/stories/new'),
+      api.get('/stories/popular'),
+    ]);
+    newStories.value = newData;
+    popularStories.value = popularData;
   } catch (error) {
     console.error("Failed to load stories from backend:", error);
     errorMessage.value = "Не вдалося завантажити історії з бази. Повторіть спробу пізніше.";
-    stories.value = [];
   } finally {
     isLoading.value = false;
   }
