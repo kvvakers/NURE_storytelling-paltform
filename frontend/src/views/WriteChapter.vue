@@ -346,11 +346,12 @@ function initSocket() {
   const userId = userStore.user?.id;
   if (!userId || !existingStoryId.value || existingChapterIndex.value === null) return;
 
-  const baseUrl = (import.meta.env.VITE_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+  const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+  const socketOrigin = apiUrl.startsWith('http') ? new URL(apiUrl).origin : window.location.origin;
   const color   = getUserColor(userId);
   const userName = userStore.user?.username || userStore.user?.email || 'Автор';
 
-  socket = io(`${baseUrl}/collaboration`, { transports: ['websocket', 'polling'] });
+  socket = io(`${socketOrigin}/collaboration`, { transports: ['websocket', 'polling'] });
 
   socket.on('connect', () => {
     socketConnected.value = true;
