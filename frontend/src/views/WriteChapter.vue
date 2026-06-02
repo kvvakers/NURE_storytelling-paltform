@@ -265,6 +265,7 @@ const activeUsers = ref(new Map<number, { userName: string; color: string }>());
 let socket: Socket | null = null;
 let lastLocalEdit = 0;
 let contentDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let isApplyingRemoteContent = false;
 
 // ─── Story / chapter data ─────────────────────────────────────────────────────
 interface Comment { id: string; selectedText: string; text: string }
@@ -294,7 +295,7 @@ const editor = useEditor({
   onUpdate({ editor }) {
     chapterData.value.content = editor.getHTML();
     lastLocalEdit = Date.now();
-    if (isCollaborating.value && socket?.connected) {
+    if (!isApplyingRemoteContent && isCollaborating.value && socket?.connected) {
       if (contentDebounceTimer) clearTimeout(contentDebounceTimer);
       contentDebounceTimer = setTimeout(() => {
         socket?.emit('content-update', {
@@ -387,7 +388,9 @@ function initSocket() {
     const current = editor.value.getHTML();
     if (current === data.content) return;
     const { from, to } = editor.value.state.selection;
-    editor.value.commands.setContent(data.content, false);
+    isApplyingRemoteContent = true;
+    editor.value.commands.setContent(data.content);
+    isApplyingRemoteContent = false;
     try {
       const size = editor.value.state.doc.content.size;
       editor.value.commands.setTextSelection({ from: Math.min(from, size - 1), to: Math.min(to, size - 1) });
