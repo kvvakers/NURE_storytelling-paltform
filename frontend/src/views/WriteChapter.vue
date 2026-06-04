@@ -251,11 +251,11 @@ const RemoteCursorsExtension = Extension.create({
 });
 
 // ─── Route / mode ─────────────────────────────────────────────────────────────
-const isAddChapterMode   = computed(() => !!route.query.storyId && route.query.chapterIndex === undefined);
-const isEditChapterMode  = computed(() => !!route.query.storyId && route.query.chapterIndex !== undefined);
-const existingStoryId    = computed(() => Number(route.query.storyId) || null);
-const existingChapterIndex = computed(() => route.query.chapterIndex !== undefined ? Number(route.query.chapterIndex) : null);
-const existingStoryTitle = computed(() => (route.query.storyTitle as string) || "");
+const isAddChapterMode   = computed(() => !!route.params.storyId && route.params.chapterIndex === undefined);
+const isEditChapterMode  = computed(() => !!route.params.storyId && route.params.chapterIndex !== undefined);
+const existingStoryId    = computed(() => Number(route.params.storyId) || null);
+const existingChapterIndex = computed(() => route.params.chapterIndex !== undefined ? Number(route.params.chapterIndex) : null);
+const existingStoryTitle = ref("");
 
 // ─── Collaboration state ──────────────────────────────────────────────────────
 const isCollaborating = computed(() => isEditChapterMode.value && !!existingStoryId.value && existingChapterIndex.value !== null);
@@ -405,20 +405,26 @@ function initSocket() {
 }
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
-onMounted(() => {
+onMounted(async () => {
   const param = route.query.storyData;
   if (param) {
     try { storyData.value = JSON.parse(param as string); } catch (e) { console.error(e); }
   }
-  if ((isAddChapterMode.value || isEditChapterMode.value) && existingStoryTitle.value) {
-    storyData.value.title = existingStoryTitle.value;
-  }
-  if (isEditChapterMode.value) {
-    const title   = route.query.chapterTitle   as string || "";
-    const content = route.query.chapterContent as string || "";
-    chapterData.value.title   = title;
-    chapterData.value.content = content;
-    editor.value?.commands.setContent(content || "<p></p>");
+  if ((isAddChapterMode.value || isEditChapterMode.value) && existingStoryId.value) {
+    try {
+      const data = await api.get(`/stories/${existingStoryId.value}`);
+      existingStoryTitle.value = data.title || "";
+      if (isEditChapterMode.value && existingChapterIndex.value !== null) {
+        const ch = data.chapters?.[existingChapterIndex.value];
+        if (ch) {
+          chapterData.value.title   = ch.title;
+          chapterData.value.content = ch.content;
+          editor.value?.commands.setContent(ch.content || "<p></p>");
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
   }
   if (isCollaborating.value) initSocket();
 });
@@ -481,6 +487,7 @@ const submitChapter = async () => {
       await api.patch(`/stories/${existingStoryId.value}/chapters/${existingChapterIndex.value}`, {
         title: chapterData.value.title,
         content: chapterData.value.content,
+        isDraft: false,
       });
       showToast("Главу збережено!", "success");
       router.push({ name: RouteName.STORY, params: { id: String(existingStoryId.value) } });
@@ -516,9 +523,43 @@ const submitChapter = async () => {
   } catch (e) { console.error(e); showToast("Помилка при публікації", "error"); }
 };
 
-const saveDraft = () => {
-  console.log("Draft:", { story: storyData.value, chapter: chapterData.value, comments: comments.value });
-  showToast("Чернетку збережено!", "info");
+const saveDraft = async () => {
+  if (!chapterData.value.title.trim()) { showToast("Введіть назву розділу", "warning"); return; }
+  if (!userStore.isAuthorized || !userStore.token) { router.push({ name: RouteName.LOGIN }); return; }
+
+  if (isEditChapterMode.value && existingStoryId.value && existingChapterIndex.value !== null) {
+    try {
+      await api.patch(`/stories/${existingStoryId.value}/chapters/${existingChapterIndex.value}`, {
+        title: chapterData.value.title,
+        content: chapterData.value.content,
+        isDraft: true,
+      });
+      showToast("Главу збережено як чернетку", "success");
+      router.push({ name: RouteName.STORY, params: { id: String(existingStoryId.value) } });
+    } catch (e) { console.error(e); showToast("Помилка при збереженні чернетки", "error"); }
+    return;
+  }
+
+  if (isAddChapterMode.value && existingStoryId.value) {
+    try {
+      await api.post(`/stories/${existingStoryId.value}/chapters`, {
+        title: chapterData.value.title,
+        content: chapterData.value.content,
+        comments: comments.value,
+        isDraft: true,
+      });
+      showToast("Главу збережено як чернетку", "success");
+      router.push({ name: RouteName.STORY, params: { id: String(existingStoryId.value) } });
+    } catch (e) { console.error(e); showToast("Помилка при збереженні чернетки", "error"); }
+    return;
+  }
+
+  try {
+    const payload = { ...storyData.value, chapter: { title: chapterData.value.title, content: chapterData.value.content, comments: comments.value, isDraft: true } };
+    const created = await api.post(`/stories`, payload);
+    showToast("Чернетку збережено!", "success");
+    router.push({ name: RouteName.STORY, params: { id: String(created.id) } });
+  } catch (e) { console.error(e); showToast("Помилка при збереженні чернетки", "error"); }
 };
 
 const goBack = () => {

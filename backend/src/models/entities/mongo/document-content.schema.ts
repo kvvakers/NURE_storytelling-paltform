@@ -19,10 +19,19 @@ export interface ChapterComment {
   replies: CommentReply[];
 }
 
+export interface StoryComment {
+  id: string;
+  text: string;
+  authorId: number;
+  createdAt: Date;
+  replies: CommentReply[];
+}
+
 export interface Chapter {
   title: string;
   content: string;
   comments: ChapterComment[];
+  isDraft?: boolean;
 }
 
 @Schema({ timestamps: true })
@@ -35,6 +44,7 @@ export class DocumentContent extends Document {
       {
         title: String,
         content: String,
+        isDraft: { type: Boolean, default: false },
         comments: {
           type: [
             {
@@ -63,6 +73,30 @@ export class DocumentContent extends Document {
     default: [],
   })
   chapters: Chapter[];
+
+  @Prop({
+    type: [
+      {
+        id: String,
+        text: String,
+        authorId: Number,
+        createdAt: { type: Date, default: Date.now },
+        replies: {
+          type: [
+            {
+              id: String,
+              text: String,
+              authorId: Number,
+              createdAt: { type: Date, default: Date.now },
+            },
+          ],
+          default: [],
+        },
+      },
+    ],
+    default: [],
+  })
+  storyComments: StoryComment[];
 
   @Prop({ type: Array, default: [] })
   history: Array<any>;

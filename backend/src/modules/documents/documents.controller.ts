@@ -16,7 +16,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { extname, join } from 'path';
 import { mkdirSync, writeFileSync } from 'fs';
-import { CreateStoryDto, CreateCommentDto, CreateChapterDto } from './dto/create-story.dto';
+import { CreateStoryDto, CreateCommentDto, CreateChapterDto, CreateStoryCommentDto } from './dto/create-story.dto';
 import { UpdateChapterDto } from './dto/update-chapter.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
 import { DocumentsService } from './documents.service';
@@ -157,6 +157,42 @@ export class DocumentsController {
     @Request() req: any,
   ) {
     return this.documentsService.deleteChapter(id, chapterIndex, req.user?.userId);
+  }
+
+  @UseGuards(OptionalJwtAuthGuard)
+  @Get(':id/comments')
+  getStoryComments(@Param('id', ParseIntPipe) id: number) {
+    return this.documentsService.getStoryComments(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/comments')
+  addStoryComment(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CreateStoryCommentDto,
+    @Request() req: any,
+  ) {
+    return this.documentsService.addStoryComment(id, dto, req.user?.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/comments/:commentId')
+  deleteStoryComment(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('commentId') commentId: string,
+  ) {
+    return this.documentsService.deleteStoryComment(id, commentId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/comments/:commentId/replies')
+  addStoryCommentReply(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('commentId') commentId: string,
+    @Body('text') text: string,
+    @Request() req: any,
+  ) {
+    return this.documentsService.addStoryCommentReply(id, commentId, text, req.user?.userId);
   }
 
   @UseGuards(OptionalJwtAuthGuard)

@@ -98,6 +98,16 @@ export class CoAuthorsService {
     return { invitationId, status: invitation.status };
   }
 
+  async removeCoAuthor(storyId: number, ownerId: number, userId: number) {
+    const meta = await this.documentMetaRepository.findOne({ where: { id: storyId } });
+    if (!meta) throw new NotFoundException('Story not found');
+    if (meta.ownerId !== ownerId) throw new ForbiddenException('Only the story owner can remove co-authors');
+
+    meta.coAuthorIds = (meta.coAuthorIds ?? []).filter(id => id !== userId);
+    await this.documentMetaRepository.save(meta);
+    return { removed: userId };
+  }
+
   async getCoAuthors(storyId: number) {
     const meta = await this.documentMetaRepository.findOne({ where: { id: storyId } });
     if (!meta) throw new NotFoundException('Story not found');

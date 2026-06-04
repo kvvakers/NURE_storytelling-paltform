@@ -6,6 +6,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   Request,
   UploadedFile,
   UseGuards,
@@ -55,6 +56,13 @@ export class UsersController {
     writeFileSync(join(uploadsDir, filename), file.buffer as Buffer);
     const avatarUrl = `/uploads/avatars/${filename}`;
     return this.usersService.updateProfile(req.user.userId, { avatar: avatarUrl });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('search')
+  searchUsers(@Query('q') q: string, @Request() req: any) {
+    if (!q?.trim()) return [];
+    return this.usersService.searchUsers(q.trim(), req.user.userId);
   }
 
   @Get(':id')

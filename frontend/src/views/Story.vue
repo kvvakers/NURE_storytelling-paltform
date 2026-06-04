@@ -74,7 +74,7 @@
             >{{ ca.username || ca.email }}</span>
           </div>
           <div v-if="story.isMine || story.isCoAuthor" class="story-owner-actions _flex _gap-12">
-            <button class="btn btn-secondary _flex _ai-c _gap-6" @click="openEditStory"><Pencil :size="15" />Редагувати</button>
+            <button class="btn btn-secondary _flex _ai-c _gap-6" @click="goToEditStory"><Pencil :size="15" />Редагувати</button>
             <button v-if="story.isMine" class="btn btn-danger _flex _ai-c _gap-6" @click="deleteStoryModal = true"><Trash2 :size="15" />Видалити</button>
           </div>
           <div v-else-if="userStore.isAuthorized" class="story-owner-actions _flex _gap-12">
@@ -115,11 +115,18 @@
             v-for="(ch, idx) in chapters"
             :key="idx"
             class="chapter-card _flex-col _ai-fs"
-            :class="{ 'chapter-card--bookmarked': !story.isMine && libraryStatus.bookmarkChapterIndex === idx }"
+            :class="{
+              'chapter-card--bookmarked': !story.isMine && libraryStatus.bookmarkChapterIndex === idx,
+              'chapter-card--draft': ch.isDraft,
+            }"
           >
             <div class="chapter-card-main _flex _flex-col _gap-4 _flex-1 _min-w-0" @click="goToRead(idx)">
               <div class="_flex _ai-c _gap-8">
                 <span class="chapter-number">Глава {{ idx + 1 }}</span>
+                <span v-if="ch.isDraft" class="draft-badge">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  Чернетка
+                </span>
                 <span v-if="!story.isMine && libraryStatus.bookmarkChapterIndex === idx" class="bookmark-badge">
                   <BookmarkCheck :size="13" />Закладка
                 </span>
@@ -149,6 +156,75 @@
           </div>
         </div>
       </div>
+
+      <!-- Story Comments -->
+      <div class="comments-section panel">
+        <h2 class="comments-title">Коментарі ({{ storyComments.length }})</h2>
+
+        <div v-if="userStore.isAuthorized" class="comment-form">
+          <textarea
+            v-model="newCommentText"
+            class="comment-textarea"
+            placeholder="Напишіть коментар до книги..."
+            rows="3"
+          ></textarea>
+          <button
+            class="btn btn-primary"
+            :disabled="!newCommentText.trim() || isSubmittingComment"
+            @click="submitStoryComment"
+          >{{ isSubmittingComment ? 'Публікація...' : 'Опублікувати' }}</button>
+        </div>
+        <p v-else class="comments-login-hint">Увійдіть, щоб залишити коментар.</p>
+
+        <div v-if="storyComments.length === 0" class="no-comments">Коментарів ще немає.</div>
+
+        <div class="comment-list _flex _flex-col _gap-12">
+          <div v-for="comment in storyComments" :key="comment.id" class="comment-item">
+            <div class="comment-header _flex _ai-c _jc-sb">
+              <span class="comment-author">{{ comment.authorName || 'Читач' }}</span>
+              <div class="_flex _ai-c _gap-8">
+                <span class="comment-date">{{ formatCommentDate(comment.createdAt) }}</span>
+                <button
+                  v-if="canDeleteStoryComment(comment)"
+                  class="btn-icon comment-delete"
+                  title="Видалити"
+                  @click="deleteStoryComment(comment.id)"
+                >✕</button>
+              </div>
+            </div>
+            <p class="comment-text">{{ comment.text }}</p>
+
+            <div v-if="comment.replies?.length" class="reply-list _flex _flex-col _gap-8">
+              <div v-for="reply in comment.replies" :key="reply.id" class="reply-item">
+                <div class="comment-header _flex _ai-c _jc-sb">
+                  <span class="comment-author reply-author">{{ reply.authorName || 'Читач' }}</span>
+                  <span class="comment-date">{{ formatCommentDate(reply.createdAt) }}</span>
+                </div>
+                <p class="comment-text">{{ reply.text }}</p>
+              </div>
+            </div>
+
+            <div v-if="userStore.isAuthorized" class="reply-form-toggle">
+              <button class="btn-link" @click="toggleStoryReply(comment.id)">
+                {{ activeReplyId === comment.id ? 'Скасувати' : 'Відповісти' }}
+              </button>
+              <div v-if="activeReplyId === comment.id" class="reply-input-row _flex _gap-8">
+                <input
+                  v-model="replyTexts[comment.id]"
+                  class="form-input reply-input"
+                  placeholder="Ваша відповідь..."
+                  @keydown.enter.prevent="submitStoryReply(comment.id)"
+                />
+                <button
+                  class="btn btn-primary btn-sm"
+                  :disabled="!replyTexts[comment.id]?.trim()"
+                  @click="submitStoryReply(comment.id)"
+                >Надіслати</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -165,148 +241,6 @@
         <div class="modal-actions">
           <button class="btn btn-secondary" @click="deleteStoryModal = false">Скасувати</button>
           <button class="btn btn-danger" @click="executeDeleteStory">Видалити</button>
-        </div>
-      </div>
-    </div>
-  </teleport>
-
-  <!-- Edit Story Modal -->
-  <teleport to="body">
-    <div v-if="editStoryModal" class="modal-overlay" @click.self="editStoryModal = false">
-      <div class="modal modal-wide">
-        <h3 class="modal-title">Редагувати історію</h3>
-
-        <div class="edit-form _flex _flex-col _gap-14">
-          <!-- Cover -->
-          <div class="form-group">
-            <label>Обкладинка</label>
-            <div class="avatar-upload">
-              <img v-if="editStory.coverPreview || editStory.cover" :src="editStory.coverPreview || resolveMedia(editStory.cover)" class="cover-preview" />
-              <label class="avatar-upload-btn">
-                Вибрати файл
-                <input type="file" accept="image/*" class="avatar-file-input" @change="onEditCoverChange" :disabled="editStory.isUploadingCover" />
-              </label>
-              <span v-if="editStory.isUploadingCover" style="font-size:13px;color:#888">Завантаження...</span>
-            </div>
-          </div>
-          <!-- Title -->
-          <div class="form-group">
-            <label>Назва</label>
-            <input v-model="editStory.title" type="text" class="form-input" />
-          </div>
-          <!-- Description -->
-          <div class="form-group">
-            <label>Опис</label>
-            <textarea v-model="editStory.description" class="form-input form-textarea"></textarea>
-          </div>
-          <!-- Characters -->
-          <div class="form-group">
-            <label>Персонажі</label>
-            <input v-model="editStory.characters" type="text" class="form-input" />
-          </div>
-          <!-- Genres -->
-          <div class="form-group">
-            <label>Жанри (через кому)</label>
-            <input v-model="editStory.genresRaw" type="text" class="form-input" />
-          </div>
-          <!-- Tags -->
-          <div class="form-group">
-            <label>Теги (через кому)</label>
-            <input v-model="editStory.tagsRaw" type="text" class="form-input" />
-          </div>
-          <!-- Language -->
-          <div class="form-group">
-            <label>Мова</label>
-            <select v-model="editStory.language" class="form-input">
-              <option value="uk">Українська</option>
-              <option value="ru">Русский</option>
-              <option value="en">English</option>
-              <option value="de">Deutsch</option>
-              <option value="fr">Français</option>
-              <option value="es">Español</option>
-            </select>
-          </div>
-          <!-- Status -->
-          <div class="form-group">
-            <label>Статус</label>
-            <select v-model="editStory.status" class="form-input">
-              <option v-for="opt in STATUS_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-          </div>
-          <!-- Series -->
-          <div class="form-group">
-            <div class="series-header _flex _ai-c _jc-sb">
-              <label>Серія</label>
-              <button type="button" class="btn btn-secondary btn-sm" @click="openCreateSeriesModal">
-                Створити серію
-              </button>
-            </div>
-            <div class="series-list">
-              <p v-if="editStory.seriesList.length === 0" class="series-empty">Серій поки нема</p>
-              <label
-                v-for="s in editStory.seriesList"
-                :key="s.id"
-                class="series-option _flex _ai-c"
-              >
-                <input
-                  type="radio"
-                  :value="s.id"
-                  v-model="editStory.seriesId"
-                  class="radio-input"
-                />
-                <span>{{ s.title }}</span>
-              </label>
-              <label v-if="editStory.seriesList.length > 0" class="series-option _flex _ai-c">
-                <input
-                  type="radio"
-                  :value="null"
-                  v-model="editStory.seriesId"
-                  class="radio-input"
-                />
-                <span class="text-muted">Без серії</span>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="editStory.error" class="error-state">{{ editStory.error }}</div>
-        <div class="modal-actions">
-          <button class="btn btn-secondary" @click="editStoryModal = false" :disabled="editStory.isSaving">Скасувати</button>
-          <button class="btn btn-primary" @click="saveEditStory" :disabled="editStory.isSaving || editStory.isUploadingCover">
-            {{ editStory.isSaving ? 'Збереження...' : 'Зберегти' }}
-          </button>
-        </div>
-      </div>
-    </div>
-  </teleport>
-
-  <!-- Create Series Modal -->
-  <teleport to="body">
-    <div v-if="showCreateSeriesModal" class="modal-overlay" @click.self="showCreateSeriesModal = false">
-      <div class="modal">
-        <div class="modal-header _flex _ai-c _jc-sb" style="margin-bottom:16px">
-          <h3 class="modal-title" style="margin:0">Нова серія</h3>
-          <button type="button" class="btn-icon" @click="showCreateSeriesModal = false">✕</button>
-        </div>
-        <div class="form-group" style="margin-bottom:16px">
-          <label>Назва серії</label>
-          <input
-            v-model="newSeriesTitle"
-            type="text"
-            placeholder="Введіть назву серії"
-            class="form-input"
-            @keydown.enter.prevent="submitCreateSeries"
-          />
-        </div>
-        <div class="modal-actions">
-          <button class="btn btn-secondary" @click="showCreateSeriesModal = false">Скасувати</button>
-          <button
-            class="btn btn-primary"
-            :disabled="isCreatingSeries || !newSeriesTitle.trim()"
-            @click="submitCreateSeries"
-          >
-            {{ isCreatingSeries ? 'Створення...' : 'Створити' }}
-          </button>
         </div>
       </div>
     </div>
@@ -391,11 +325,7 @@ import { Pencil, Trash2, Plus, BookmarkPlus, BookmarkCheck, Heart } from "lucide
 interface Chapter {
   title: string;
   content: string;
-}
-
-interface SeriesItem {
-  id: number;
-  title: string;
+  isDraft?: boolean;
 }
 
 interface CoAuthorUser {
@@ -456,26 +386,9 @@ const submitRating = async (stars: number) => {
   }
 };
 
+
 const deleteModal = ref({ visible: false, chapterIndex: -1, chapterTitle: "" });
 const deleteStoryModal = ref(false);
-
-const editStoryModal = ref(false);
-const editStory = ref({
-  title: '',
-  description: '',
-  characters: '',
-  genresRaw: '',
-  tagsRaw: '',
-  language: '',
-  cover: '',
-  coverPreview: '',
-  isUploadingCover: false,
-  isSaving: false,
-  error: '',
-  seriesId: null as number | null,
-  seriesList: [] as SeriesItem[],
-  status: 'in_progress',
-});
 
 const STATUS_OPTIONS = [
   { value: 'in_progress', label: 'В процесі' },
@@ -492,12 +405,83 @@ const statusBadgeClass = (s?: string) => ({
   'badge-frozen':    s === 'frozen',
 });
 
-const showCreateSeriesModal = ref(false);
-const newSeriesTitle = ref('');
-const isCreatingSeries = ref(false);
+interface StoryCommentReply {
+  id: string;
+  text: string;
+  authorId?: number;
+  authorName?: string;
+  createdAt?: string;
+}
+
+interface StoryComment {
+  id: string;
+  text: string;
+  authorId?: number;
+  authorName?: string;
+  createdAt?: string;
+  replies?: StoryCommentReply[];
+}
 
 const story = ref<Story | null>(null);
 const chapters = ref<Chapter[]>([]);
+const storyComments = ref<StoryComment[]>([]);
+const newCommentText = ref('');
+const isSubmittingComment = ref(false);
+const activeReplyId = ref<string | null>(null);
+const replyTexts = ref<Record<string, string>>({});
+
+const formatCommentDate = (d?: string) =>
+  d ? new Date(d).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+
+const canDeleteStoryComment = (comment: StoryComment) => {
+  if (!userStore.isAuthorized) return false;
+  const me = (userStore as any).user?.id ?? (userStore as any).userId;
+  return comment.authorId === me || story.value?.isMine;
+};
+
+const loadStoryComments = async (id: number) => {
+  try {
+    storyComments.value = await api.get(`/stories/${id}/comments`);
+  } catch { storyComments.value = []; }
+};
+
+const submitStoryComment = async () => {
+  if (!story.value || !newCommentText.value.trim()) return;
+  isSubmittingComment.value = true;
+  try {
+    const comment = await api.post(`/stories/${story.value.id}/comments`, { text: newCommentText.value.trim() });
+    storyComments.value.push(comment);
+    newCommentText.value = '';
+  } catch { showToast('Помилка при публікації', 'error'); }
+  finally { isSubmittingComment.value = false; }
+};
+
+const deleteStoryComment = async (commentId: string) => {
+  if (!story.value) return;
+  try {
+    await api.del(`/stories/${story.value.id}/comments/${commentId}`);
+    storyComments.value = storyComments.value.filter(c => c.id !== commentId);
+  } catch { showToast('Помилка при видаленні', 'error'); }
+};
+
+const toggleStoryReply = (commentId: string) => {
+  activeReplyId.value = activeReplyId.value === commentId ? null : commentId;
+};
+
+const submitStoryReply = async (commentId: string) => {
+  if (!story.value) return;
+  const text = replyTexts.value[commentId]?.trim();
+  if (!text) return;
+  try {
+    const reply = await api.post(`/stories/${story.value.id}/comments/${commentId}/replies`, { text });
+    const comment = storyComments.value.find(c => c.id === commentId);
+    if (comment) {
+      comment.replies = [...(comment.replies ?? []), reply];
+    }
+    replyTexts.value[commentId] = '';
+    activeReplyId.value = null;
+  } catch { showToast('Помилка при відповіді', 'error'); }
+};
 
 // Library
 const libraryStatus = ref({ inLibrary: false, liked: false, categories: [] as number[], bookmarkChapterIndex: null as number | null });
@@ -511,6 +495,7 @@ const loadingCategories = ref(false);
 const loadStory = async () => {
   story.value = null;
   userRating.value = null;
+  storyComments.value = [];
   libraryStatus.value = { inLibrary: false, liked: false, categories: [], bookmarkChapterIndex: null };
   const id = Number(route.params.id);
   if (!id) return;
@@ -518,6 +503,7 @@ const loadStory = async () => {
     const data = await api.get(`/stories/${id}`);
     story.value = data;
     chapters.value = data.chapters || [];
+    void loadStoryComments(id);
     if (userStore.isAuthorized && !data.isMine) {
       try {
         libraryStatus.value = await api.get(`/library/check/${id}`);
@@ -615,92 +601,9 @@ const executeDeleteStory = async () => {
   }
 };
 
-const openEditStory = async () => {
+const goToEditStory = () => {
   if (!story.value) return;
-  editStory.value.title = story.value.title;
-  editStory.value.description = story.value.description;
-  editStory.value.characters = (story.value as any).characters || '';
-  editStory.value.genresRaw = (story.value.genres || []).join(', ');
-  editStory.value.tagsRaw = ((story.value as any).tags || []).join(', ');
-  editStory.value.language = (story.value as any).language || '';
-  editStory.value.cover = story.value.cover;
-  editStory.value.coverPreview = '';
-  editStory.value.error = '';
-  editStory.value.seriesId = story.value.seriesId ?? null;
-  editStory.value.status = story.value.status ?? 'in_progress';
-  editStoryModal.value = true;
-  try {
-    editStory.value.seriesList = await api.get('/series');
-  } catch {
-    editStory.value.seriesList = [];
-  }
-};
-
-const openCreateSeriesModal = () => {
-  newSeriesTitle.value = '';
-  showCreateSeriesModal.value = true;
-};
-
-const submitCreateSeries = async () => {
-  if (!newSeriesTitle.value.trim()) return;
-  isCreatingSeries.value = true;
-  try {
-    const created: SeriesItem = await api.post('/series', { title: newSeriesTitle.value.trim() });
-    editStory.value.seriesList.push(created);
-    editStory.value.seriesId = created.id;
-    showCreateSeriesModal.value = false;
-    showToast('Серію створено', 'success');
-  } catch {
-    showToast('Помилка при створенні серії', 'error');
-  } finally {
-    isCreatingSeries.value = false;
-  }
-};
-
-const onEditCoverChange = async (e: Event) => {
-  const file = (e.target as HTMLInputElement).files?.[0];
-  if (!file) return;
-  editStory.value.coverPreview = URL.createObjectURL(file);
-  editStory.value.isUploadingCover = true;
-  try {
-    const fd = new FormData();
-    fd.append('cover', file);
-    const res = await api.post('/stories/upload-cover', fd);
-    editStory.value.cover = res.url;
-    editStory.value.coverPreview = (await import('../utils/resolveMedia')).resolveMedia(res.url);
-  } catch {
-    showToast('Помилка завантаження обкладинки', 'error');
-    editStory.value.coverPreview = '';
-  } finally {
-    editStory.value.isUploadingCover = false;
-  }
-};
-
-const saveEditStory = async () => {
-  if (!story.value) return;
-  editStory.value.isSaving = true;
-  editStory.value.error = '';
-  try {
-    const payload: Record<string, any> = {
-      title: editStory.value.title,
-      description: editStory.value.description,
-      characters: editStory.value.characters,
-      genres: editStory.value.genresRaw.split(',').map(s => s.trim()).filter(Boolean),
-      tags: editStory.value.tagsRaw.split(',').map(s => s.trim()).filter(Boolean),
-      language: editStory.value.language,
-      cover: editStory.value.cover,
-      seriesId: editStory.value.seriesId,
-      status: editStory.value.status,
-    };
-    const updated = await api.patch(`/stories/${story.value.id}`, payload);
-    Object.assign(story.value, updated);
-    editStoryModal.value = false;
-    showToast('Історію збережено', 'success');
-  } catch (e: any) {
-    editStory.value.error = e?.data?.message || e?.message || 'Помилка збереження';
-  } finally {
-    editStory.value.isSaving = false;
-  }
+  router.push({ name: RouteName.EDIT_STORY, params: { id: story.value.id } });
 };
 
 const goToRead = (idx: number) => {
@@ -712,7 +615,7 @@ const goToAddChapter = () => {
   if (!story.value) return;
   router.push({
     name: RouteName.WRITE_CHAPTER,
-    query: { storyId: String(story.value.id), storyTitle: story.value.title },
+    params: { storyId: String(story.value.id) },
   });
 };
 
@@ -722,13 +625,7 @@ const editChapter = (idx: number) => {
   if (!chapter) return;
   router.push({
     name: RouteName.WRITE_CHAPTER,
-    query: {
-      storyId: String(story.value.id),
-      storyTitle: story.value.title,
-      chapterIndex: String(idx),
-      chapterTitle: chapter.title,
-      chapterContent: chapter.content,
-    },
+    params: { storyId: String(story.value.id), chapterIndex: String(idx) },
   });
 };
 
@@ -915,25 +812,6 @@ const stripHtml = (html: string) => {
 
 .story-owner-actions { margin-top: 20px; }
 
-.modal-wide { max-width: 560px; width: 100%; }
-
-.edit-form {
-  max-height: 60vh;
-  overflow-y: auto;
-  padding-right: 4px;
-  margin-bottom: 16px;
-}
-
-.edit-form-group label { font-size: 13px; font-weight: 600; color: #444; }
-
-.cover-preview {
-  width: 80px;
-  height: 112px;
-  object-fit: cover;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-}
-
 .series-header {
   margin-bottom: 8px;
 }
@@ -1108,10 +986,155 @@ const stripHtml = (html: string) => {
 
 .category-option:hover { background-color: #f5f5f5; }
 
+.chapter-card--draft {
+  border-color: #e2e8f0;
+  background-color: #f8fafc;
+  opacity: 0.9;
+}
+
+.chapter-card--draft:hover {
+  border-color: #94a3b8;
+}
+
+.draft-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+  background-color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+
+.comments-section {
+  padding: 32px 40px;
+  margin-bottom: 40px;
+}
+
+.comments-title {
+  margin: 0 0 20px;
+  font-size: 1.4rem;
+  color: var(--color-text);
+}
+
+.comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.comment-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.comment-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.comments-login-hint {
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  margin-bottom: 20px;
+}
+
+.no-comments {
+  color: #999;
+  text-align: center;
+  padding: 24px 0;
+  font-size: 0.95rem;
+}
+
+.comment-item {
+  border: 1px solid #e8e8e8;
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+}
+
+.comment-header {
+  margin-bottom: 6px;
+}
+
+.comment-author {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.comment-date {
+  font-size: 0.8rem;
+  color: #999;
+}
+
+.comment-delete {
+  font-size: 0.75rem;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.comment-delete:hover { opacity: 1; }
+
+.comment-text {
+  margin: 0 0 8px;
+  font-size: 0.92rem;
+  color: #444;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.reply-list {
+  margin: 8px 0;
+  padding-left: 16px;
+  border-left: 2px solid #e8e8e8;
+}
+
+.reply-item {
+  background: #fafafa;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+
+.reply-author { color: var(--color-primary); }
+
+.reply-form-toggle { margin-top: 6px; }
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.reply-input-row {
+  margin-top: 8px;
+  align-items: center;
+}
+
+.reply-input {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 0.88rem;
+}
+
 @media (max-width: 768px) {
   .story-metadata { flex-direction: column; padding: 20px; }
   .cover { width: 100%; height: auto; }
   .chapters-section { padding: 20px; }
   .chapter-card-actions { width: 100%; }
+  .comments-section { padding: 20px; }
 }
 </style>

@@ -11,7 +11,9 @@ import {
   CreateStoryDto,
   CreateCommentDto,
   CreateChapterDto,
+  CreateStoryCommentDto,
 } from './dto/create-story.dto';
+import { UpdateChapterDto } from './dto/update-chapter.dto';
 import { UpdateStoryDto } from './dto/update-story.dto';
 import { DocumentMeta } from '../../models/entities/postgres/document-meta.entity';
 import { User } from '../../models/entities/postgres/user.entity';
@@ -21,16 +23,12 @@ import { StoryRating } from '../../models/entities/postgres/story-rating.entity'
 import {
   ChapterComment,
   CommentReply,
+  StoryComment,
   DocumentContent,
   DocumentContentDocument,
 } from '../../models/entities/mongo/document-content.schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
-
-interface UpdateChapterDto {
-  title?: string;
-  content?: string;
-}
 
 @Injectable()
 export class DocumentsService {
@@ -82,6 +80,7 @@ export class DocumentsService {
         {
           title: createStoryDto.chapter.title,
           content: createStoryDto.chapter.content,
+          isDraft: createStoryDto.chapter.isDraft ?? false,
           comments: (createStoryDto.chapter.comments ?? []) as ChapterComment[],
         },
       ],
@@ -248,7 +247,7 @@ export class DocumentsService {
   async updateStory(id: number, dto: UpdateStoryDto, userId: number) {
     const meta = await this.documentMetaRepository.findOne({ where: { id } });
     if (!meta) throw new NotFoundException(`Story with id ${id} not found`);
-    if (meta.ownerId !== userId) throw new ForbiddenException('Not allowed');
+    if (meta.ownerId !== userId && !(meta.coAuthorIds ?? []).includes(userId)) throw new ForbiddenException('Not allowed');
 
     if (dto.title !== undefined) meta.title = dto.title;
     if (dto.description !== undefined) meta.description = dto.description;
@@ -337,6 +336,9 @@ export class DocumentsService {
       updateChapterDto.title || content.chapters[chapterIndex].title;
     content.chapters[chapterIndex].content =
       updateChapterDto.content || content.chapters[chapterIndex].content;
+    if (updateChapterDto.isDraft !== undefined) {
+      content.chapters[chapterIndex].isDraft = updateChapterDto.isDraft;
+    }
 
     await content.save();
 
@@ -373,11 +375,17 @@ export class DocumentsService {
     const ratingCount = await this.ratingRepository.count({ where: { storyId: id } });
 
     const isCoAuthor = userId != null && (meta.coAuthorIds ?? []).includes(userId);
+    const isAuthor = (userId != null && meta.ownerId === userId) || isCoAuthor;
     let coAuthors: { id: number; username: string | null; email: string; avatar?: string | null }[] = [];
     if ((meta.coAuthorIds ?? []).length > 0) {
       const coAuthorUsers = await this.userRepository.findByIds(meta.coAuthorIds);
       coAuthors = coAuthorUsers.map(u => ({ id: u.id, username: u.username, email: u.email, avatar: u.avatar }));
     }
+
+    const allChapters = content?.chapters || [];
+    const visibleChapters = isAuthor
+      ? allChapters
+      : allChapters.filter(ch => !ch.isDraft);
 
     return {
       id: meta.id,
@@ -395,7 +403,7 @@ export class DocumentsService {
       seriesTitle,
       status: meta.status,
       createdAt: meta.createdAt.toISOString(),
-      chapters: content?.chapters || [],
+      chapters: visibleChapters,
       ownerId: meta.ownerId as number | undefined,
       isMine: userId != null && meta.ownerId === userId,
       isCoAuthor,
@@ -620,6 +628,149 @@ export class DocumentsService {
     return reply;
   }
 
+  async addStoryComment(
+    storyId: number,
+    dto: CreateStoryCommentDto,
+    authorId: number,
+  ): Promise<StoryComment> {
+    const comment: StoryComment = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      text: dto.text,
+      authorId,
+      createdAt: new Date(),
+      replies: [],
+    };
+
+    const result = await this.documentContentModel.findOneAndUpdate(
+      { documentId: storyId },
+      { $push: { storyComments: comment } },
+      { new: true },
+    );
+
+    if (!result) {
+      throw new NotFoundException(`Story ${storyId} not found`);
+    }
+
+    const meta = await this.documentMetaRepository.findOne({ where: { id: storyId } });
+    if (meta?.ownerId && meta.ownerId !== authorId) {
+      const commenter = await this.userRepository.findOne({ where: { id: authorId } });
+      const commenterName = commenter ? (commenter.username || commenter.email) : 'Читач';
+      await this.notificationsService.createNotification({
+        userId: meta.ownerId,
+        type: 'comment',
+        message: `${commenterName} залишив коментар до вашої історії «${meta.title}»`,
+        storyId,
+      });
+    }
+
+    return comment;
+  }
+
+  async getStoryComments(
+    storyId: number,
+  ): Promise<(StoryComment & { authorName?: string; replies: (CommentReply & { authorName?: string })[] })[]> {
+    type LeanContent = { storyComments?: StoryComment[] };
+    const content = await this.documentContentModel
+      .findOne({ documentId: storyId })
+      .lean<LeanContent>();
+
+    if (!content) throw new NotFoundException(`Story ${storyId} not found`);
+
+    const comments = content.storyComments ?? [];
+
+    const authorIds = new Set<number>();
+    for (const c of comments) {
+      if (c.authorId) authorIds.add(c.authorId);
+      for (const r of c.replies ?? []) {
+        if (r.authorId) authorIds.add(r.authorId);
+      }
+    }
+
+    const userMap = new Map<number, string>();
+    if (authorIds.size > 0) {
+      const users = await this.userRepository.findByIds([...authorIds]);
+      for (const u of users) userMap.set(u.id, u.username || u.email);
+    }
+
+    return comments.map((c) => ({
+      ...c,
+      authorName: c.authorId ? userMap.get(c.authorId) : undefined,
+      replies: (c.replies ?? []).map((r) => ({
+        ...r,
+        authorName: r.authorId ? userMap.get(r.authorId) : undefined,
+      })),
+    }));
+  }
+
+  async deleteStoryComment(
+    storyId: number,
+    commentId: string,
+  ): Promise<{ deleted: string }> {
+    const result = await this.documentContentModel.findOneAndUpdate(
+      { documentId: storyId },
+      { $pull: { storyComments: { id: commentId } } },
+      { new: true },
+    );
+
+    if (!result) {
+      throw new NotFoundException(`Story ${storyId} not found`);
+    }
+
+    return { deleted: commentId };
+  }
+
+  async addStoryCommentReply(
+    storyId: number,
+    commentId: string,
+    text: string,
+    authorId: number,
+  ): Promise<CommentReply> {
+    const reply: CommentReply = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      text,
+      authorId,
+      createdAt: new Date(),
+    };
+
+    const result = await this.documentContentModel.findOneAndUpdate(
+      {
+        documentId: storyId,
+        storyComments: { $elemMatch: { id: commentId } },
+      },
+      {
+        $push: {
+          'storyComments.$[c].replies': reply,
+        },
+      },
+      {
+        new: true,
+        arrayFilters: [{ 'c.id': commentId }],
+      },
+    );
+
+    if (!result) {
+      throw new NotFoundException(
+        `Story ${storyId} or comment ${commentId} not found`,
+      );
+    }
+
+    const originalComment = result.storyComments?.find((c) => c.id === commentId);
+    if (originalComment?.authorId && originalComment.authorId !== authorId) {
+      const replier = await this.userRepository.findOne({ where: { id: authorId } });
+      const meta = await this.documentMetaRepository.findOne({ where: { id: storyId } });
+      const replierName = replier ? (replier.username || replier.email) : 'Читач';
+      const storyTitle = meta?.title ?? 'невідома історія';
+      await this.notificationsService.createNotification({
+        userId: originalComment.authorId,
+        type: 'reply',
+        message: `${replierName} відповів на ваш коментар до історії «${storyTitle}»`,
+        storyId,
+      });
+    }
+
+    return reply;
+  }
+
   async addChapter(
     storyId: number,
     chapterDto: CreateChapterDto,
@@ -650,6 +801,7 @@ export class DocumentsService {
     const newChapter = {
       title: chapterDto.title,
       content: chapterDto.content,
+      isDraft: chapterDto.isDraft ?? false,
       comments: (chapterDto.comments ?? []) as ChapterComment[],
     };
 

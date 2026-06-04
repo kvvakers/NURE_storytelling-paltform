@@ -1,9 +1,11 @@
 <template>
-  <div class="create-story _page">
+  <div class="edit-story _page">
     <div class="_container">
-      <h1 class="_h1">Створити історію</h1>
+      <h1 class="_h1">Редагувати історію</h1>
 
-      <form @submit.prevent="submitStory" class="form panel">
+      <div v-if="loading" class="loading-state">Завантаження...</div>
+
+      <form v-else-if="story" @submit.prevent="submitEdit" class="form panel">
         <!-- Cover Image -->
         <div class="form-group">
           <label for="cover">Обкладинка</label>
@@ -35,7 +37,7 @@
 
         <!-- Title -->
         <div class="form-group">
-          <label for="title">Название</label>
+          <label for="title">Назва</label>
           <input
             id="title"
             v-model="formData.title"
@@ -96,15 +98,12 @@
             type="text"
             placeholder="Теги через кому (наприклад: фантастика, пригода, любов)"
             class="form-input"
+            @input="updateTags"
           />
           <div class="tags-preview _flex _flex-wrap _gap-8">
             <span v-for="tag in parsedTags" :key="tag" class="badge-primary _flex _ai-c _gap-6">
               {{ tag }}
-              <button
-                type="button"
-                @click="removeTag(tag)"
-                class="tag-remove"
-              >×</button>
+              <button type="button" @click="removeTag(tag)" class="tag-remove">×</button>
             </span>
           </div>
         </div>
@@ -120,6 +119,14 @@
             <option value="de">Deutsch</option>
             <option value="fr">Français</option>
             <option value="es">Español</option>
+          </select>
+        </div>
+
+        <!-- Status -->
+        <div class="form-group">
+          <label for="status">Статус</label>
+          <select v-model="formData.status" id="status" class="form-input">
+            <option v-for="opt in STATUS_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select>
         </div>
 
@@ -158,9 +165,19 @@
           </div>
         </div>
 
-        <!-- Co-Authors -->
-        <div class="form-group" v-if="userStore.isAuthorized">
-          <label>Запросити співавторів</label>
+        <!-- Co-Authors (only owner can manage) -->
+        <div class="form-group" v-if="story.isMine">
+          <label>Співавтори</label>
+          <div v-if="story.coAuthors?.length" class="coauthors-current _flex _flex-wrap _gap-8">
+            <span
+              v-for="ca in story.coAuthors"
+              :key="ca.id"
+              class="badge-primary _flex _ai-c _gap-6"
+            >
+              {{ ca.username || ca.email }}
+              <button type="button" class="tag-remove" @click="removeCoAuthor(ca.id)">×</button>
+            </span>
+          </div>
           <div class="coauthor-search">
             <input
               v-model="coauthorSearch"
@@ -170,54 +187,51 @@
               @input="onCoauthorSearchInput"
             />
           </div>
-          <div v-if="searchResults.length > 0" class="coauthor-list">
-            <label
-              v-for="u in searchResults"
+          <div v-if="coauthorSearchResults.length > 0" class="coauthor-list">
+            <div
+              v-for="u in coauthorSearchResults"
               :key="u.id"
-              class="coauthor-option _flex _ai-c"
+              class="coauthor-option _flex _ai-c _jc-sb"
             >
-              <input
-                type="checkbox"
-                :value="u.id"
-                :checked="selectedUsers.some(s => s.id === u.id)"
-                @change="toggleInvitee(u)"
-                class="checkbox-input"
-              />
-              <img :src="resolveMedia(u.avatar) || placeholderAvatar" class="coauthor-avatar" :alt="u.username || u.email" />
-              <span>{{ u.username || u.email }}</span>
-            </label>
+              <div class="_flex _ai-c _gap-8">
+                <img :src="resolveMedia(u.avatar) || placeholderAvatar" class="coauthor-avatar" :alt="u.username || u.email" />
+                <span>{{ u.username || u.email }}</span>
+              </div>
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                :disabled="coauthorInvited.includes(u.id)"
+                @click="inviteCoAuthor(u.id)"
+              >{{ coauthorInvited.includes(u.id) ? 'Надіслано' : 'Запросити' }}</button>
+            </div>
           </div>
-          <div v-else-if="coauthorSearch.trim() && !searchLoading" class="coauthor-empty">Нікого не знайдено</div>
-          <div v-if="selectedUsers.length > 0" class="selected-invitees _flex _flex-wrap _gap-8">
-            <span
-              v-for="u in selectedUsers"
-              :key="u.id"
-              class="badge-primary _flex _ai-c _gap-6"
-            >
-              {{ u.username || u.email }}
-              <button type="button" class="tag-remove" @click="removeInvitee(u.id)">×</button>
-            </span>
-          </div>
+          <div v-else-if="coauthorSearch.trim() && !coauthorSearchLoading" class="coauthor-empty">Нікого не знайдено</div>
         </div>
+
+        <div v-if="saveError" class="error-state">{{ saveError }}</div>
 
         <!-- Submit Button -->
         <div class="form-actions _flex _gap-12">
-          <button type="submit" class="btn btn-primary btn-lg _flex-1">Опубликовать историю</button>
-          <router-link :to="{ name: RouteName.HOME }" class="btn btn-secondary btn-lg _flex-1 _jc-c">
-            Отмена
-          </router-link>
+          <button type="submit" class="btn btn-primary btn-lg _flex-1" :disabled="isSaving || isUploadingCover">
+            {{ isSaving ? 'Збереження...' : 'Зберегти зміни' }}
+          </button>
+          <button type="button" class="btn btn-secondary btn-lg _flex-1" @click="goBack">
+            Скасувати
+          </button>
         </div>
       </form>
+
+      <div v-else class="not-found">Історія не знайдена</div>
     </div>
   </div>
 
   <!-- Create Series Modal -->
   <Teleport to="body">
-    <div v-if="showCreateSeriesModal" class="modal-overlay" @click.self="closeCreateSeriesModal">
+    <div v-if="showCreateSeriesModal" class="modal-overlay" @click.self="showCreateSeriesModal = false">
       <div class="modal">
         <div class="modal-header _flex _ai-c _jc-sb">
           <h2 class="modal-title">Нова серія</h2>
-          <button type="button" class="btn-close" @click="closeCreateSeriesModal">✕</button>
+          <button type="button" class="btn-close" @click="showCreateSeriesModal = false">✕</button>
         </div>
         <div class="modal-body">
           <div class="form-group">
@@ -233,7 +247,7 @@
           </div>
         </div>
         <div class="modal-footer _flex _gap-12 _jc-e">
-          <button type="button" class="btn btn-secondary" @click="closeCreateSeriesModal">Скасувати</button>
+          <button type="button" class="btn btn-secondary" @click="showCreateSeriesModal = false">Скасувати</button>
           <button
             type="button"
             class="btn btn-primary"
@@ -250,12 +264,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { RouteName } from "../router/keys";
 import { useToast } from "../composables/useToast";
 import { api } from "../utils/api";
 import { resolveMedia } from "../utils/resolveMedia";
-import { useUserStore } from "../stores/user";
 
 const placeholderAvatar = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="%23ccc"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>';
 
@@ -264,54 +277,33 @@ interface SeriesItem {
   title: string;
 }
 
-interface SocialUser {
+interface CoAuthorUser {
   id: number;
   username: string | null;
   email: string;
   avatar?: string | null;
 }
 
-const router = useRouter();
-const userStore = useUserStore();
-const { show: showToast } = useToast();
-const previewImage = ref("");
+interface Story {
+  id: number;
+  title: string;
+  description: string;
+  characters?: string;
+  genres: string[];
+  tags: string[];
+  language?: string;
+  cover: string;
+  seriesId?: number | null;
+  status?: string;
+  isMine?: boolean;
+  coAuthors?: CoAuthorUser[];
+}
 
-const searchResults = ref<SocialUser[]>([]);
-const selectedUsers = ref<SocialUser[]>([]);
-const coauthorSearch = ref("");
-const searchLoading = ref(false);
-let searchTimer: ReturnType<typeof setTimeout> | null = null;
-
-const onCoauthorSearchInput = () => {
-  if (searchTimer) clearTimeout(searchTimer);
-  const q = coauthorSearch.value.trim();
-  if (!q) { searchResults.value = []; return; }
-  searchTimer = setTimeout(async () => {
-    searchLoading.value = true;
-    try {
-      const results: SocialUser[] = await api.get(`/users/search?q=${encodeURIComponent(q)}`);
-      searchResults.value = results.filter(u => !selectedUsers.value.some(s => s.id === u.id));
-    } catch {
-      searchResults.value = [];
-    } finally {
-      searchLoading.value = false;
-    }
-  }, 300);
-};
-
-const toggleInvitee = (user: SocialUser) => {
-  const idx = selectedUsers.value.findIndex(u => u.id === user.id);
-  if (idx === -1) {
-    selectedUsers.value.push(user);
-    searchResults.value = searchResults.value.filter(u => u.id !== user.id);
-  } else {
-    selectedUsers.value.splice(idx, 1);
-  }
-};
-
-const removeInvitee = (id: number) => {
-  selectedUsers.value = selectedUsers.value.filter(u => u.id !== id);
-};
+const STATUS_OPTIONS = [
+  { value: 'in_progress', label: 'В процесі' },
+  { value: 'completed',   label: 'Завершено' },
+  { value: 'frozen',      label: 'Заморожено' },
+] as const;
 
 const availableGenres = [
   "Драма",
@@ -323,76 +315,96 @@ const availableGenres = [
   "Ужас",
   "Комедия",
   "Детектив",
-  "История"
+  "История",
 ];
 
+const route = useRoute();
+const router = useRouter();
+const { show: showToast } = useToast();
+
+const story = ref<Story | null>(null);
+const loading = ref(true);
+const isSaving = ref(false);
+const isUploadingCover = ref(false);
+const saveError = ref('');
+const previewImage = ref('');
+
 const formData = ref({
-  title: "",
-  description: "",
-  characters: "",
+  title: '',
+  description: '',
+  characters: '',
   genres: [] as string[],
-  tags: "",
-  language: "",
-  cover: "",
+  tags: '',
+  language: '',
+  cover: '',
   seriesId: null as number | null,
+  status: 'in_progress',
 });
 
 const parsedTags = ref<string[]>([]);
-const isUploadingCover = ref(false);
-
 const seriesList = ref<SeriesItem[]>([]);
 const showCreateSeriesModal = ref(false);
-const newSeriesTitle = ref("");
+const newSeriesTitle = ref('');
 const isCreatingSeries = ref(false);
 
+const coauthorSearch = ref('');
+const coauthorSearchResults = ref<CoAuthorUser[]>([]);
+const coauthorSearchLoading = ref(false);
+const coauthorInvited = ref<number[]>([]);
+let coauthorSearchTimer: ReturnType<typeof setTimeout> | null = null;
+
 onMounted(async () => {
+  const id = Number(route.params.id);
+  if (!id) { loading.value = false; return; }
   try {
-    seriesList.value = await api.get("/series");
+    const data: Story = await api.get(`/stories/${id}`);
+    story.value = data;
+    formData.value.title = data.title;
+    formData.value.description = data.description;
+    formData.value.characters = data.characters || '';
+    formData.value.genres = [...(data.genres || [])];
+    const tagsArr = data.tags || [];
+    formData.value.tags = tagsArr.join(', ');
+    parsedTags.value = [...tagsArr];
+    formData.value.language = (data as any).language || '';
+    formData.value.cover = data.cover || '';
+    formData.value.seriesId = data.seriesId ?? null;
+    formData.value.status = data.status || 'in_progress';
+    if (data.cover) {
+      previewImage.value = resolveMedia(data.cover);
+    }
+    seriesList.value = await api.get('/series');
   } catch {
-    // not authenticated or error — leave list empty
+    story.value = null;
+  } finally {
+    loading.value = false;
   }
 });
 
-const openCreateSeriesModal = () => {
-  newSeriesTitle.value = "";
-  showCreateSeriesModal.value = true;
+const updateTags = () => {
+  const raw = formData.value.tags;
+  parsedTags.value = raw.trim()
+    ? raw.split(',').map(t => t.trim()).filter(Boolean)
+    : [];
 };
 
-const closeCreateSeriesModal = () => {
-  showCreateSeriesModal.value = false;
-};
-
-const submitCreateSeries = async () => {
-  if (!newSeriesTitle.value.trim()) return;
-  isCreatingSeries.value = true;
-  try {
-    const created: SeriesItem = await api.post("/series", { title: newSeriesTitle.value.trim() });
-    seriesList.value.push(created);
-    formData.value.seriesId = created.id;
-    closeCreateSeriesModal();
-    showToast("Серію створено", "success");
-  } catch {
-    showToast("Помилка при створенні серії", "error");
-  } finally {
-    isCreatingSeries.value = false;
-  }
+const removeTag = (tag: string) => {
+  parsedTags.value = parsedTags.value.filter(t => t !== tag);
+  formData.value.tags = parsedTags.value.join(', ');
 };
 
 const handleImageUpload = async (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  const file = target.files?.[0];
+  const file = (event.target as HTMLInputElement).files?.[0];
   if (!file) return;
-
   previewImage.value = URL.createObjectURL(file);
-
   isUploadingCover.value = true;
   try {
-    const formData2 = new FormData();
-    formData2.append('cover', file);
-    const res = await api.post('/stories/upload-cover', formData2);
+    const fd = new FormData();
+    fd.append('cover', file);
+    const res = await api.post('/stories/upload-cover', fd);
     formData.value.cover = res.url;
     previewImage.value = resolveMedia(res.url);
-  } catch (e) {
+  } catch {
     showToast('Помилка завантаження обкладинки', 'error');
     previewImage.value = '';
     formData.value.cover = '';
@@ -402,51 +414,78 @@ const handleImageUpload = async (event: Event) => {
 };
 
 const removeCover = () => {
-  previewImage.value = "";
-  formData.value.cover = "";
+  previewImage.value = '';
+  formData.value.cover = '';
 };
 
-const updateTags = () => {
-  if (formData.value.tags.trim()) {
-    parsedTags.value = formData.value.tags
-      .split(",")
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0);
-  } else {
-    parsedTags.value = [];
-  }
+const openCreateSeriesModal = () => {
+  newSeriesTitle.value = '';
+  showCreateSeriesModal.value = true;
 };
 
-const removeTag = (tag: string) => {
-  parsedTags.value = parsedTags.value.filter(t => t !== tag);
-  formData.value.tags = parsedTags.value.join(", ");
-};
-
-const submitStory = async () => {
-  updateTags();
-
-  if (!formData.value.title.trim()) {
-    showToast("Будь ласка, введіть назву", "warning");
-    return;
-  }
-
-  if (!formData.value.description.trim()) {
-    showToast("Будь ласка, введіть опис", "warning");
-    return;
-  }
-
-  if (formData.value.genres.length === 0) {
-    showToast("Будь ласка, виберіть принаймні один жанр", "warning");
-    return;
-  }
-
-  if (!formData.value.language) {
-    showToast("Будь ласка, виберіть мову", "warning");
-    return;
-  }
-
+const submitCreateSeries = async () => {
+  if (!newSeriesTitle.value.trim()) return;
+  isCreatingSeries.value = true;
   try {
-    const storyPayload: Record<string, any> = {
+    const created: SeriesItem = await api.post('/series', { title: newSeriesTitle.value.trim() });
+    seriesList.value.push(created);
+    formData.value.seriesId = created.id;
+    showCreateSeriesModal.value = false;
+    showToast('Серію створено', 'success');
+  } catch {
+    showToast('Помилка при створенні серії', 'error');
+  } finally {
+    isCreatingSeries.value = false;
+  }
+};
+
+const onCoauthorSearchInput = () => {
+  if (coauthorSearchTimer) clearTimeout(coauthorSearchTimer);
+  const q = coauthorSearch.value.trim();
+  if (!q) { coauthorSearchResults.value = []; return; }
+  coauthorSearchTimer = setTimeout(async () => {
+    coauthorSearchLoading.value = true;
+    try {
+      const results: CoAuthorUser[] = await api.get(`/users/search?q=${encodeURIComponent(q)}`);
+      const existingIds = new Set((story.value?.coAuthors ?? []).map(ca => ca.id));
+      coauthorSearchResults.value = results.filter(u => !existingIds.has(u.id));
+    } catch {
+      coauthorSearchResults.value = [];
+    } finally {
+      coauthorSearchLoading.value = false;
+    }
+  }, 300);
+};
+
+const inviteCoAuthor = async (userId: number) => {
+  if (!story.value) return;
+  try {
+    await api.post(`/stories/${story.value.id}/co-authors/invite`, { inviteeId: userId });
+    coauthorInvited.value.push(userId);
+  } catch (e: any) {
+    showToast(e?.data?.message || 'Помилка при запрошенні', 'error');
+  }
+};
+
+const removeCoAuthor = async (userId: number) => {
+  if (!story.value) return;
+  try {
+    await api.del(`/stories/${story.value.id}/co-authors/${userId}`);
+    if (story.value.coAuthors) {
+      story.value.coAuthors = story.value.coAuthors.filter(ca => ca.id !== userId);
+    }
+  } catch (e: any) {
+    showToast(e?.data?.message || 'Помилка при видаленні', 'error');
+  }
+};
+
+const submitEdit = async () => {
+  if (!story.value) return;
+  updateTags();
+  saveError.value = '';
+  isSaving.value = true;
+  try {
+    await api.patch(`/stories/${story.value.id}`, {
       title: formData.value.title,
       description: formData.value.description,
       characters: formData.value.characters,
@@ -454,22 +493,23 @@ const submitStory = async () => {
       tags: parsedTags.value,
       language: formData.value.language,
       cover: formData.value.cover,
-    };
+      seriesId: formData.value.seriesId,
+      status: formData.value.status,
+    });
+    showToast('Історію збережено', 'success');
+    router.push({ name: RouteName.STORY, params: { id: story.value.id } });
+  } catch (e: any) {
+    saveError.value = e?.data?.message || e?.message || 'Помилка збереження';
+  } finally {
+    isSaving.value = false;
+  }
+};
 
-    if (formData.value.seriesId !== null) {
-      storyPayload.seriesId = formData.value.seriesId;
-    }
-
-    const query: Record<string, string> = {
-      storyData: JSON.stringify(storyPayload),
-    };
-    if (selectedUsers.value.length > 0) {
-      query.invitees = selectedUsers.value.map(u => u.id).join(',');
-    }
-    router.push({ name: RouteName.WRITE_CHAPTER, query });
-  } catch (error) {
-    console.error("Error submitting story:", error);
-    showToast("Ошибка при переходе к написанию главы", "error");
+const goBack = () => {
+  if (story.value) {
+    router.push({ name: RouteName.STORY, params: { id: story.value.id } });
+  } else {
+    router.back();
   }
 };
 </script>
@@ -488,6 +528,14 @@ h1 {
   border: 1px solid #e5e5e5;
 }
 
+.loading-state,
+.not-found {
+  text-align: center;
+  padding: 60px 20px;
+  font-size: 1.1rem;
+  color: var(--color-text-muted);
+}
+
 .form-group {
   margin-bottom: 24px;
 }
@@ -504,7 +552,6 @@ h1 {
   min-height: 120px;
 }
 
-/* Image Upload */
 .image-upload {
   position: relative;
   cursor: pointer;
@@ -576,11 +623,6 @@ h1 {
   left: 0;
 }
 
-.image-upload {
-  position: relative;
-}
-
-/* Checkboxes */
 .checkbox-group {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -609,7 +651,6 @@ h1 {
   color: var(--color-text);
 }
 
-/* Tags */
 .tags-preview {
   margin-top: 12px;
 }
@@ -629,12 +670,6 @@ h1 {
   opacity: 0.7;
 }
 
-/* Form Actions */
-.form-actions {
-  margin-top: 32px;
-}
-
-/* Series */
 .series-header {
   margin-bottom: 8px;
 }
@@ -680,6 +715,66 @@ h1 {
 
 .text-muted {
   color: var(--color-text-muted);
+}
+
+.coauthors-current {
+  margin-bottom: 12px;
+}
+
+.coauthor-search {
+  margin-bottom: 10px;
+}
+
+.coauthor-list {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.coauthor-option {
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.2s ease;
+}
+
+.coauthor-option:hover {
+  background-color: #f5f5f5;
+}
+
+.coauthor-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.coauthor-empty {
+  margin-top: 6px;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+.error-state {
+  color: var(--color-danger, #dc2626);
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: #fef2f2;
+  border-radius: var(--radius-sm);
+  border: 1px solid #fecaca;
+}
+
+.form-actions {
+  margin-top: 32px;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.85rem;
 }
 
 /* Modal */
@@ -733,56 +828,6 @@ h1 {
 
 .btn-close:hover {
   color: var(--color-text);
-}
-
-.btn-sm {
-  padding: 6px 12px;
-  font-size: 0.85rem;
-}
-
-.hint-text {
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-  margin: 0 0 10px;
-}
-
-.coauthor-search {
-  margin-bottom: 10px;
-}
-
-.coauthor-list {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 8px;
-  max-height: 180px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.coauthor-option {
-  cursor: pointer;
-  padding: 6px 8px;
-  border-radius: var(--radius-sm);
-  transition: background-color 0.2s ease;
-  gap: 10px;
-}
-
-.coauthor-option:hover {
-  background-color: #f5f5f5;
-}
-
-.coauthor-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-
-.selected-invitees {
-  margin-top: 10px;
 }
 
 @media (max-width: 768px) {

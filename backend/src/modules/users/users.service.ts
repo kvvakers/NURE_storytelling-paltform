@@ -52,6 +52,17 @@ export class UsersService {
     return profile;
   }
 
+  async searchUsers(query: string, excludeId?: number) {
+    const q = `%${query.toLowerCase()}%`;
+    const qb = this.userRepository
+      .createQueryBuilder('u')
+      .where('(LOWER(u.username) LIKE :q OR LOWER(u.email) LIKE :q)', { q })
+      .limit(20);
+    if (excludeId) qb.andWhere('u.id != :excludeId', { excludeId });
+    const users = await qb.getMany();
+    return users.map(({ password, ...u }) => u);
+  }
+
   async updateProfile(id: number, dto: UpdateProfileDto) {
     const user = await this.userRepository.findOne({ where: { id } });
     if (!user) throw new NotFoundException('User not found');

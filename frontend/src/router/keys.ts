@@ -6,6 +6,7 @@ export const RouteName = Object.freeze({
   PROFILE: "profile",
   MY_PROFILE: "my-profile",
   CREATE_STORY: "create-story",
+  EDIT_STORY: "edit-story",
   WRITE_CHAPTER: "write-chapter",
   LOGIN: "login",
   REGISTER: "register",

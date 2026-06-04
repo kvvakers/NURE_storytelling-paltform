@@ -41,7 +41,13 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
-    path: "/write-chapter",
+    path: "/story/:id/edit",
+    name: RouteName.EDIT_STORY,
+    component: () => import("../views/EditStory.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/write-chapter/:storyId?/:chapterIndex?",
     name: RouteName.WRITE_CHAPTER,
     component: () => import("../views/WriteChapter.vue"),
     meta: { requiresAuth: true },

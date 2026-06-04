@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -29,6 +30,16 @@ export class CoAuthorsController {
   @Get('stories/:id/co-authors')
   getCoAuthors(@Param('id', ParseIntPipe) storyId: number) {
     return this.coAuthorsService.getCoAuthors(storyId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('stories/:id/co-authors/:userId')
+  removeCoAuthor(
+    @Param('id', ParseIntPipe) storyId: number,
+    @Param('userId', ParseIntPipe) userId: number,
+    @Request() req: any,
+  ) {
+    return this.coAuthorsService.removeCoAuthor(storyId, req.user.userId, userId);
   }
 
   @UseGuards(JwtAuthGuard)

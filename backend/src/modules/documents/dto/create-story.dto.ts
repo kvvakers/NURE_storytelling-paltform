@@ -4,10 +4,15 @@ export class CreateCommentDto {
   text: string;
 }
 
+export class CreateStoryCommentDto {
+  text: string;
+}
+
 export class CreateChapterDto {
   title: string;
   content: string;
   comments?: CreateCommentDto[];
+  isDraft?: boolean;
 }
 
 export class CreateStoryDto {
