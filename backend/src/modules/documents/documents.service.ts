@@ -332,14 +332,33 @@ export class DocumentsService {
       );
     }
 
-    content.chapters[chapterIndex].title =
-      updateChapterDto.title || content.chapters[chapterIndex].title;
-    content.chapters[chapterIndex].content =
-      updateChapterDto.content || content.chapters[chapterIndex].content;
-    if (updateChapterDto.isDraft !== undefined) {
-      content.chapters[chapterIndex].isDraft = updateChapterDto.isDraft;
+    const chapter = content.chapters[chapterIndex];
+    const isPublished = !chapter.isDraft;
+
+    if (updateChapterDto.isDraft === true && isPublished) {
+      // Saving a draft of an already-published chapter:
+      // store changes separately so the published version stays intact
+      if (updateChapterDto.title !== undefined) chapter.draftTitle = updateChapterDto.title;
+      if (updateChapterDto.content !== undefined) chapter.draftContent = updateChapterDto.content;
+    } else if (updateChapterDto.isDraft === false) {
+      // Publishing: apply whatever was being edited (or the pending draft) to the main fields
+      const newTitle   = updateChapterDto.title   ?? chapter.draftTitle   ?? chapter.title;
+      const newContent = updateChapterDto.content ?? chapter.draftContent ?? chapter.content;
+      chapter.title   = newTitle;
+      chapter.content = newContent;
+      chapter.isDraft     = false;
+      chapter.draftTitle   = undefined;
+      chapter.draftContent = undefined;
+    } else {
+      // Updating a pure draft (isDraft is still true or not set)
+      if (updateChapterDto.title !== undefined)   chapter.title   = updateChapterDto.title;
+      if (updateChapterDto.content !== undefined) chapter.content = updateChapterDto.content;
+      if (updateChapterDto.isDraft !== undefined) chapter.isDraft  = updateChapterDto.isDraft;
     }
 
+    if (updateChapterDto.isHidden !== undefined) chapter.isHidden = updateChapterDto.isHidden;
+
+    content.markModified('chapters');
     await content.save();
 
     return {
@@ -385,7 +404,7 @@ export class DocumentsService {
     const allChapters = content?.chapters || [];
     const visibleChapters = isAuthor
       ? allChapters
-      : allChapters.filter(ch => !ch.isDraft);
+      : allChapters.filter(ch => !ch.isDraft && !ch.isHidden);
 
     return {
       id: meta.id,

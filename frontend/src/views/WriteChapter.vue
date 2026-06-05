@@ -418,9 +418,11 @@ onMounted(async () => {
       if (isEditChapterMode.value && existingChapterIndex.value !== null) {
         const ch = data.chapters?.[existingChapterIndex.value];
         if (ch) {
-          chapterData.value.title   = ch.title;
-          chapterData.value.content = ch.content;
-          editor.value?.commands.setContent(ch.content || "<p></p>");
+          // If the published chapter has a pending draft, edit that instead
+          chapterData.value.title   = ch.draftTitle   != null ? ch.draftTitle   : ch.title;
+          chapterData.value.content = ch.draftContent != null ? ch.draftContent : ch.content;
+          const editContent = ch.draftContent != null ? ch.draftContent : ch.content;
+          editor.value?.commands.setContent(editContent || "<p></p>");
         }
       }
     } catch (e) {

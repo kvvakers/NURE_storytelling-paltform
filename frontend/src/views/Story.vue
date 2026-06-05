@@ -118,6 +118,7 @@
             :class="{
               'chapter-card--bookmarked': !story.isMine && libraryStatus.bookmarkChapterIndex === idx,
               'chapter-card--draft': ch.isDraft,
+              'chapter-card--hidden': ch.isHidden,
             }"
           >
             <div class="chapter-card-main _flex _flex-col _gap-4 _flex-1 _min-w-0" @click="goToRead(idx)">
@@ -126,6 +127,13 @@
                 <span v-if="ch.isDraft" class="draft-badge">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                   Чернетка
+                </span>
+                <span v-if="!ch.isDraft && (ch.draftTitle || ch.draftContent) && (story.isMine || story.isCoAuthor)" class="pending-draft-badge">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                  Є чернетка
+                </span>
+                <span v-if="ch.isHidden && (story.isMine || story.isCoAuthor)" class="hidden-badge">
+                  <EyeOff :size="11" />Приховано
                 </span>
                 <span v-if="!story.isMine && libraryStatus.bookmarkChapterIndex === idx" class="bookmark-badge">
                   <BookmarkCheck :size="13" />Закладка
@@ -142,6 +150,17 @@
                 title="Редагувати"
               >
                 <Pencil :size="14" />Редагувати
+              </button>
+              <button
+                type="button"
+                class="btn btn-secondary _flex _ai-c _gap-6"
+                :class="{ 'btn-hidden-active': ch.isHidden }"
+                @click.stop="toggleHideChapter(idx)"
+                :title="ch.isHidden ? 'Показати' : 'Приховати'"
+              >
+                <EyeOff v-if="ch.isHidden" :size="14" />
+                <Eye v-else :size="14" />
+                {{ ch.isHidden ? 'Показати' : 'Приховати' }}
               </button>
               <button
                 v-if="story.isMine"
@@ -320,12 +339,15 @@ import { RouteName } from "../router/keys";
 import { api } from '../utils/api';
 import { resolveMedia } from '../utils/resolveMedia';
 import placeholderImg from '../assets/placeholder.jpg';
-import { Pencil, Trash2, Plus, BookmarkPlus, BookmarkCheck, Heart } from "lucide-vue-next";
+import { Pencil, Trash2, Plus, BookmarkPlus, BookmarkCheck, Heart, EyeOff, Eye } from "lucide-vue-next";
 
 interface Chapter {
   title: string;
   content: string;
   isDraft?: boolean;
+  isHidden?: boolean;
+  draftTitle?: string;
+  draftContent?: string;
 }
 
 interface CoAuthorUser {
@@ -627,6 +649,20 @@ const editChapter = (idx: number) => {
     name: RouteName.WRITE_CHAPTER,
     params: { storyId: String(story.value.id), chapterIndex: String(idx) },
   });
+};
+
+const toggleHideChapter = async (idx: number) => {
+  if (!story.value) return;
+  const chapter = chapters.value[idx];
+  if (!chapter) return;
+  const newHidden = !chapter.isHidden;
+  try {
+    await api.patch(`/stories/${story.value.id}/chapters/${idx}`, { isHidden: newHidden });
+    chapter.isHidden = newHidden;
+    showToast(newHidden ? 'Главу приховано' : 'Главу показано', 'success');
+  } catch {
+    showToast('Помилка при зміні видимості', 'error');
+  }
 };
 
 const confirmDeleteChapter = (idx: number) => {
@@ -996,6 +1032,16 @@ const stripHtml = (html: string) => {
   border-color: #94a3b8;
 }
 
+.chapter-card--hidden {
+  border-color: #e9d5ff;
+  background-color: #faf5ff;
+  opacity: 0.85;
+}
+
+.chapter-card--hidden:hover {
+  border-color: #d8b4fe;
+}
+
 .draft-badge {
   display: inline-flex;
   align-items: center;
@@ -1007,6 +1053,42 @@ const stripHtml = (html: string) => {
   border: 1px solid #cbd5e1;
   border-radius: 10px;
   padding: 2px 8px;
+}
+
+.pending-draft-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #92400e;
+  background-color: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+
+.hidden-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #6b21a8;
+  background-color: #f3e8ff;
+  border: 1px solid #d8b4fe;
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+
+.btn-hidden-active {
+  background-color: #f3e8ff;
+  color: #6b21a8;
+  border-color: #d8b4fe;
+}
+
+.btn-hidden-active:hover {
+  background-color: #e9d5ff;
 }
 
 .comments-section {

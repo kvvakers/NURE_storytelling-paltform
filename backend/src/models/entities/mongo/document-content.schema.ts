@@ -32,6 +32,9 @@ export interface Chapter {
   content: string;
   comments: ChapterComment[];
   isDraft?: boolean;
+  draftTitle?: string;
+  draftContent?: string;
+  isHidden?: boolean;
 }
 
 @Schema({ timestamps: true })
@@ -45,6 +48,9 @@ export class DocumentContent extends Document {
         title: String,
         content: String,
         isDraft: { type: Boolean, default: false },
+        isHidden: { type: Boolean, default: false },
+        draftTitle: { type: String, default: null },
+        draftContent: { type: String, default: null },
         comments: {
           type: [
             {
