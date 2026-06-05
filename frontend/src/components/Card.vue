@@ -68,7 +68,7 @@ defineProps({
 .cover {
   width: 100%;
   height: 250px;
-  object-fit: cover;
+  object-fit: contain;
 }
 .info {
   padding: 16px;

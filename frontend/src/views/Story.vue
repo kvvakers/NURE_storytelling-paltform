@@ -713,7 +713,7 @@ const stripHtml = (html: string) => {
 .cover {
   width: 280px;
   height: 400px;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 12px;
   box-shadow: var(--shadow-sm);
 }

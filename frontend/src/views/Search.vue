@@ -4,7 +4,12 @@
       <div class="search-header">
         <h2 class="_h2">Результати пошуку</h2>
         <div v-if="activeFilters.length" class="active-filters _flex _flex-wrap _gap-8">
-          <span v-for="f in activeFilters" :key="f" class="active-filter-badge">{{ f }}</span>
+          <span v-for="f in activeFilters" :key="f.label" class="active-filter-badge _flex _ai-c _gap-4">
+            {{ f.label }}
+            <button class="filter-badge-remove" @click="removeFilter(f.key, f.value)" :title="`Видалити фільтр ${f.label}`">
+              <X :size="12" />
+            </button>
+          </span>
         </div>
       </div>
 
@@ -22,9 +27,11 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
+import { X } from "lucide-vue-next";
 import Card from "../components/Card.vue";
 import { api } from '../utils/api';
+import { RouteName } from '../router/keys';
 
 interface Story {
   id: number;
@@ -53,26 +60,45 @@ const LANGUAGE_LABELS: Record<string, string> = {
   es: 'Español',
 };
 
+interface FilterItem {
+  label: string;
+  key: string;
+  value?: string;
+}
+
 const route = useRoute();
+const router = useRouter();
 const stories = ref<Story[]>([]);
 const isLoading = ref(true);
 const errorMessage = ref("");
 
-const activeFilters = computed(() => {
-  const result: string[] = [];
+const activeFilters = computed<FilterItem[]>(() => {
+  const result: FilterItem[] = [];
   const q = route.query.q as string | undefined;
   const genres = route.query.genres as string | undefined;
   const tags = route.query.tags as string | undefined;
   const status = route.query.status as string | undefined;
   const language = route.query.language as string | undefined;
 
-  if (q) result.push(`"${q}"`);
-  if (genres) genres.split(',').forEach(g => result.push(g));
-  if (tags) tags.split(',').forEach(t => result.push(`#${t.trim()}`));
-  if (status && STATUS_LABELS[status]) result.push(STATUS_LABELS[status]);
-  if (language && LANGUAGE_LABELS[language]) result.push(LANGUAGE_LABELS[language]);
+  if (q) result.push({ label: `"${q}"`, key: 'q' });
+  if (genres) genres.split(',').forEach(g => result.push({ label: g, key: 'genres', value: g }));
+  if (tags) tags.split(',').forEach(t => result.push({ label: `#${t.trim()}`, key: 'tags', value: t.trim() }));
+  if (status && STATUS_LABELS[status]) result.push({ label: STATUS_LABELS[status], key: 'status' });
+  if (language && LANGUAGE_LABELS[language]) result.push({ label: LANGUAGE_LABELS[language], key: 'language' });
   return result;
 });
+
+const removeFilter = (key: string, value?: string) => {
+  const query = { ...route.query };
+  if ((key === 'genres' || key === 'tags') && value) {
+    const parts = (query[key] as string).split(',').map(s => s.trim()).filter(s => s !== value);
+    if (parts.length) query[key] = parts.join(',');
+    else delete query[key];
+  } else {
+    delete query[key];
+  }
+  router.push({ name: RouteName.SEARCH, query });
+};
 
 const loadStories = async () => {
   isLoading.value = true;
@@ -118,12 +144,31 @@ watch(() => route.query, loadStories, { deep: true });
   margin-bottom: 12px;
 }
 .active-filter-badge {
-  display: inline-block;
-  padding: 4px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px 4px 12px;
   background: #e7f3ff;
   color: var(--color-primary);
   border-radius: 20px;
   font-size: 0.85rem;
   font-weight: 500;
+}
+
+.filter-badge-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-primary);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  border-radius: 50%;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+  line-height: 1;
+}
+.filter-badge-remove:hover {
+  opacity: 1;
 }
 </style>

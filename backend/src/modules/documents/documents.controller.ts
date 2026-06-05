@@ -80,6 +80,11 @@ export class DocumentsController {
     return this.documentsService.getPopularStories(15);
   }
 
+  @Get('popular-by-genres')
+  getPopularByGenres(@Query('limit') limit?: string) {
+    return this.documentsService.getPopularStoriesByGenres(limit ? parseInt(limit, 10) : 6);
+  }
+
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {

@@ -218,6 +218,43 @@ export class DocumentsService {
     return this.mapMetasToDto(ordered);
   }
 
+  async getPopularStoriesByGenres(limit: number) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 14);
+
+    const rows = await this.ratingRepository
+      .createQueryBuilder('r')
+      .select('r.storyId', 'storyId')
+      .addSelect('COUNT(r.id)', 'cnt')
+      .where('r.createdAt >= :cutoff', { cutoff })
+      .groupBy('r.storyId')
+      .orderBy('"cnt"', 'DESC')
+      .limit(200)
+      .getRawMany<{ storyId: string; cnt: string }>();
+
+    if (rows.length === 0) return [];
+
+    const storyIds = rows.map(r => Number(r.storyId));
+    const metas = await this.documentMetaRepository.findByIds(storyIds);
+    const metaMap = new Map(metas.map(m => [m.id, m]));
+    const ordered = storyIds.map(id => metaMap.get(id)).filter((m): m is DocumentMeta => m != null);
+
+    const mapped = await this.mapMetasToDto(ordered);
+
+    const genreMap = new Map<string, typeof mapped>();
+    for (const story of mapped) {
+      for (const genre of (story.genres ?? [])) {
+        if (!genreMap.has(genre)) genreMap.set(genre, []);
+        const arr = genreMap.get(genre)!;
+        if (arr.length < limit) arr.push(story);
+      }
+    }
+
+    return Array.from(genreMap.entries())
+      .filter(([, stories]) => stories.length > 0)
+      .map(([genre, stories]) => ({ genre, stories }));
+  }
+
   private async mapMetasToDto(metas: DocumentMeta[]) {
     if (metas.length === 0) return [];
 
@@ -829,8 +866,8 @@ export class DocumentsService {
 
     const newChapterIndex = content.chapters.length - 1;
 
-    // Notify followers of the author
-    if (meta.ownerId) {
+    // Notify followers of the author only when publishing (not for drafts)
+    if (meta.ownerId && !chapterDto.isDraft) {
       const author = await this.userRepository.findOne({ where: { id: meta.ownerId } });
       const authorName = author ? (author.username || author.email) : 'Автор';
       const followerIds = await this.subscriptionsService.getFollowerIds(meta.ownerId);

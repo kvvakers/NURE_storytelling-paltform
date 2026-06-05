@@ -25,6 +25,7 @@
           </span>
         </div>
         <div class="word-count-badge">Слів: {{ wordCount }} | Символів: {{ charCount }}</div>
+        <span v-if="autoSaveStatus" class="autosave-status">{{ autoSaveStatus }}</span>
         <button class="docs-btn-share" @click="submitChapter">{{ isEditChapterMode ? 'Зберегти зміни' : 'Опублікувати' }}</button>
       </div>
     </div>
@@ -265,6 +266,7 @@ const activeUsers = ref(new Map<number, { userName: string; color: string }>());
 let socket: Socket | null = null;
 let lastLocalEdit = 0;
 let contentDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let autoSaveTimer: ReturnType<typeof setInterval> | null = null;
 let isApplyingRemoteContent = false;
 
 // ─── Story / chapter data ─────────────────────────────────────────────────────
@@ -280,6 +282,8 @@ const pendingSelectedText = ref("");
 const pendingCommentText = ref("");
 const hasSelection = ref(false);
 const isCommentMode = ref(false);
+const autoSaveStatus = ref('');
+const autoSavedChapterIndex = ref<number | null>(null);
 
 // ─── Editor ───────────────────────────────────────────────────────────────────
 const remoteCursors = ref(new Map<number, RemoteCursor>());
@@ -430,12 +434,14 @@ onMounted(async () => {
     }
   }
   if (isCollaborating.value) initSocket();
+  autoSaveTimer = setInterval(autoSaveDraft, 60_000);
 });
 
 onBeforeUnmount(() => {
   editor.value?.destroy();
   socket?.disconnect();
   if (contentDebounceTimer) clearTimeout(contentDebounceTimer);
+  if (autoSaveTimer) clearInterval(autoSaveTimer);
 });
 
 // ─── Editor helpers ───────────────────────────────────────────────────────────
@@ -480,6 +486,49 @@ const cancelComment = () => {
 const removeComment = (id: string) => { comments.value = comments.value.filter((c) => c.id !== id); };
 
 // ─── Submit / Save ────────────────────────────────────────────────────────────
+const autoSaveDraft = async () => {
+  if (!chapterData.value.title.trim()) return;
+  if (!userStore.isAuthorized || !userStore.token) return;
+
+  try {
+    autoSaveStatus.value = 'Збереження...';
+
+    if (isEditChapterMode.value && existingStoryId.value && existingChapterIndex.value !== null) {
+      await api.patch(`/stories/${existingStoryId.value}/chapters/${existingChapterIndex.value}`, {
+        title: chapterData.value.title,
+        content: chapterData.value.content,
+        isDraft: true,
+      });
+    } else if (isAddChapterMode.value && existingStoryId.value) {
+      if (autoSavedChapterIndex.value === null) {
+        const resp = await api.post(`/stories/${existingStoryId.value}/chapters`, {
+          title: chapterData.value.title,
+          content: chapterData.value.content,
+          comments: comments.value,
+          isDraft: true,
+        });
+        autoSavedChapterIndex.value = resp.chapterIndex;
+      } else {
+        await api.patch(`/stories/${existingStoryId.value}/chapters/${autoSavedChapterIndex.value}`, {
+          title: chapterData.value.title,
+          content: chapterData.value.content,
+          isDraft: true,
+        });
+      }
+    } else {
+      return;
+    }
+
+    const now = new Date();
+    const hh = now.getHours().toString().padStart(2, '0');
+    const mm = now.getMinutes().toString().padStart(2, '0');
+    autoSaveStatus.value = `Автозбережено о ${hh}:${mm}`;
+  } catch (e) {
+    console.error('Autosave failed:', e);
+    autoSaveStatus.value = 'Помилка автозбереження';
+  }
+};
+
 const submitChapter = async () => {
   if (!chapterData.value.title.trim()) { showToast("Введіть назву розділу", "warning"); return; }
   if ((editor.value?.getText() ?? "").trim().length < 100) { showToast("Розділ повинен містити щонайменше 100 символів", "warning"); return; }
@@ -500,11 +549,19 @@ const submitChapter = async () => {
 
   if (isAddChapterMode.value && existingStoryId.value) {
     try {
-      await api.post(`/stories/${existingStoryId.value}/chapters`, {
-        title: chapterData.value.title,
-        content: chapterData.value.content,
-        comments: comments.value,
-      });
+      if (autoSavedChapterIndex.value !== null) {
+        await api.patch(`/stories/${existingStoryId.value}/chapters/${autoSavedChapterIndex.value}`, {
+          title: chapterData.value.title,
+          content: chapterData.value.content,
+          isDraft: false,
+        });
+      } else {
+        await api.post(`/stories/${existingStoryId.value}/chapters`, {
+          title: chapterData.value.title,
+          content: chapterData.value.content,
+          comments: comments.value,
+        });
+      }
       showToast("Нову главу опубліковано!", "success");
       router.push({ name: RouteName.STORY, params: { id: String(existingStoryId.value) } });
     } catch (e) { console.error(e); showToast("Помилка при публікації глави", "error"); }
@@ -545,12 +602,20 @@ const saveDraft = async () => {
 
   if (isAddChapterMode.value && existingStoryId.value) {
     try {
-      await api.post(`/stories/${existingStoryId.value}/chapters`, {
-        title: chapterData.value.title,
-        content: chapterData.value.content,
-        comments: comments.value,
-        isDraft: true,
-      });
+      if (autoSavedChapterIndex.value !== null) {
+        await api.patch(`/stories/${existingStoryId.value}/chapters/${autoSavedChapterIndex.value}`, {
+          title: chapterData.value.title,
+          content: chapterData.value.content,
+          isDraft: true,
+        });
+      } else {
+        await api.post(`/stories/${existingStoryId.value}/chapters`, {
+          title: chapterData.value.title,
+          content: chapterData.value.content,
+          comments: comments.value,
+          isDraft: true,
+        });
+      }
       showToast("Главу збережено як чернетку", "success");
       router.push({ name: RouteName.STORY, params: { id: String(existingStoryId.value) } });
     } catch (e) { console.error(e); showToast("Помилка при збереженні чернетки", "error"); }
@@ -594,6 +659,7 @@ const goBack = () => {
 .docs-title-input:hover { background: #f1f3f4; }
 .docs-title-input:focus { background: #fff; box-shadow: 0 0 0 2px #4285F4; }
 .docs-subtitle { font-size: 12px; color: #9aa0a6; padding-left: 6px; }
+.autosave-status { font-size: 12px; color: #9aa0a6; white-space: nowrap; }
 .docs-topbar-right { padding-bottom: 6px; }
 .word-count-badge { font-size: 12px; color: #5f6368; white-space: nowrap; }
 .docs-btn-share {

@@ -5,7 +5,7 @@
     <template v-else>
       <header class="profile-header">
         <div class="profile-main _flex _gap-40 _ai-fs">
-          <img :src="resolveMedia(profile.avatar) || 'https://via.placeholder.com/150'" :alt="profile.username || profile.email" class="profile-avatar" />
+          <img :src="resolveMedia(profile.avatar) || placeholderImg" :alt="profile.username || profile.email" class="profile-avatar" />
 
           <div class="profile-info _flex-1">
             <div class="profile-title _flex _ai-c _gap-20">
@@ -258,6 +258,7 @@
 </template>
 
 <script setup>
+import placeholderImg from "../assets/placeholder_avatar.png";
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { formatDate } from "../utils/formatDate";
 import Card from "../components/Card.vue";

@@ -28,7 +28,7 @@
           <swiper-slide v-for="story in newStories" :key="story.id">
             <div class="story-card panel _flex _flex-col">
               <RouterLink :to="{name: RouteName.STORY, params: {id: story.id}}">
-                <img :src="resolveMedia(story.cover) || 'src/assets/placeholder.jpg'" alt="cover" class="_shrink-0" />
+                <img :src="resolveMedia(story.cover) || placeholderImg" alt="cover" class="_shrink-0" />
                 <div class="story-card-info">
                   <h3>{{ story.title }}</h3>
                   <p>{{ story.author || 'Автор не вказаний' }}</p>
@@ -55,7 +55,7 @@
           <swiper-slide v-for="story in popularStories" :key="story.id">
             <div class="story-card panel _flex _flex-col">
               <RouterLink :to="{name: RouteName.STORY, params: {id: story.id}}">
-                <img :src="resolveMedia(story.cover) || 'src/assets/placeholder.jpg'" alt="cover" />
+                <img :src="resolveMedia(story.cover) || placeholderImg" alt="cover" />
                 <div class="story-card-info">
                   <h3>{{ story.title }}</h3>
                   <p>{{ story.author || 'Автор не вказаний' }}</p>
@@ -66,6 +66,20 @@
           </swiper-slide>
         </swiper>
       </section>
+      <template v-for="section in genreSections" :key="section.genre">
+        <section class="section">
+          <div class="genre-section-header _flex _ai-c _jc-sb">
+            <h2 class="_h2">{{ section.genre }}</h2>
+            <RouterLink
+              :to="{ name: RouteName.SEARCH, query: { genres: section.genre } }"
+              class="genre-more-link"
+            >Всі →</RouterLink>
+          </div>
+          <div class="genre-grid">
+            <Card v-for="story in section.stories" :key="story.id" :story="story" />
+          </div>
+        </section>
+      </template>
     </div>
   </div>
 </template>
@@ -81,6 +95,8 @@ import SwiperCore from "swiper";
 import { RouteName } from "../router/keys";
 import { api } from '../utils/api';
 import { resolveMedia } from '../utils/resolveMedia';
+import placeholderImg from '../assets/placeholder.jpg';
+import Card from '../components/Card.vue';
 SwiperCore.use([Navigation]);
 
 interface Story {
@@ -89,22 +105,34 @@ interface Story {
   cover: string;
   rating: number;
   createdAt: string;
+  created_at: string;
   author?: string;
+  description?: string;
+  genres?: string[];
+  ownerId?: number;
+}
+
+interface GenreSection {
+  genre: string;
+  stories: Story[];
 }
 
 const newStories = ref<Story[]>([]);
 const popularStories = ref<Story[]>([]);
+const genreSections = ref<GenreSection[]>([]);
 const isLoading = ref(true);
 const errorMessage = ref<string | null>(null);
 
 onMounted(async () => {
   try {
-    const [newData, popularData] = await Promise.all([
+    const [newData, popularData, genreData] = await Promise.all([
       api.get('/stories/new'),
       api.get('/stories/popular'),
+      api.get('/stories/popular-by-genres?limit=6'),
     ]);
     newStories.value = newData;
     popularStories.value = popularData;
+    genreSections.value = genreData;
   } catch (error) {
     console.error("Failed to load stories from backend:", error);
     errorMessage.value = "Не вдалося завантажити історії з бази. Повторіть спробу пізніше.";
@@ -177,5 +205,32 @@ onMounted(async () => {
 .swiper-fade::after {
   right: 0;
   background: linear-gradient(to left, #fff, transparent);
+}
+
+.genre-section-header {
+  margin-bottom: 15px;
+}
+
+.genre-more-link {
+  font-size: 0.9rem;
+  color: var(--color-primary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.genre-more-link:hover {
+  text-decoration: underline;
+}
+
+.genre-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1400px) {
+  .genre-grid { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 900px) {
+  .genre-grid { grid-template-columns: repeat(2, 1fr); }
 }
 </style>

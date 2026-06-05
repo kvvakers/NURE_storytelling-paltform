@@ -36,7 +36,7 @@
         </RouterLink>
         <RouterLink :to="{ name: RouteName.MY_PROFILE }" class="profile _flex _ai-c">
           <div class="profile-img">
-            <img :src="resolveMedia(userStore.user?.avatar)" alt="Avatar">
+            <img :src="resolveMedia(userStore.user?.avatar) || placeholderImg" alt="Avatar">
           </div>
           <div class="profile-name">{{ userStore.user?.username || userStore.user?.email }}</div>
         </RouterLink>
@@ -72,6 +72,7 @@
 </template>
 
 <script setup lang="ts">
+import placeholderImg from "../assets/placeholder_avatar.png";
 import { ref, watch, onMounted, onUnmounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { RouteName } from "../router/keys";

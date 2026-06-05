@@ -202,8 +202,8 @@
 
         <!-- Submit Button -->
         <div class="form-actions _flex _gap-12">
-          <button type="submit" class="btn btn-primary btn-lg _flex-1">Опубликовать историю</button>
-          <router-link :to="{ name: RouteName.HOME }" class="btn btn-secondary btn-lg _flex-1 _jc-c">
+          <button type="submit" class="btn btn-primary btn-lg">Опубликовать историю</button>
+          <router-link :to="{ name: RouteName.HOME }" class="btn btn-secondary btn-lg _jc-c">
             Отмена
           </router-link>
         </div>
@@ -493,7 +493,6 @@ h1 {
 }
 
 .form-group label {
-  display: block;
   margin-bottom: 8px;
   font-weight: 600;
   color: var(--color-text);

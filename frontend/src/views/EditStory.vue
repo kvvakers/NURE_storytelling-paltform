@@ -212,10 +212,10 @@
 
         <!-- Submit Button -->
         <div class="form-actions _flex _gap-12">
-          <button type="submit" class="btn btn-primary btn-lg _flex-1" :disabled="isSaving || isUploadingCover">
+          <button type="submit" class="btn btn-primary btn-lg " :disabled="isSaving || isUploadingCover">
             {{ isSaving ? 'Збереження...' : 'Зберегти зміни' }}
           </button>
-          <button type="button" class="btn btn-secondary btn-lg _flex-1" @click="goBack">
+          <button type="button" class="btn btn-secondary btn-lg " @click="goBack">
             Скасувати
           </button>
         </div>
@@ -541,7 +541,6 @@ h1 {
 }
 
 .form-group label {
-  display: block;
   margin-bottom: 8px;
   font-weight: 600;
   color: var(--color-text);
