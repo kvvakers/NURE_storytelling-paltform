@@ -3,9 +3,14 @@
     <div class="_container">
       <!-- Header -->
       <div class="read-header _flex _ai-c _jc-sb _flex-wrap _gap-12">
-        <button class="btn btn-secondary back-btn _flex _ai-c _gap-6" @click="router.push({ name: RouteName.STORY, params: { id: storyId } })">
-          <ArrowLeft :size="16" />Назад до історії
-        </button>
+        <div class="_flex _ai-c _gap-12">
+          <button class="btn btn-secondary back-btn _flex _ai-c _gap-6" @click="router.push({ name: RouteName.STORY, params: { id: storyId } })">
+            <ArrowLeft :size="16" />Назад до історії
+          </button>
+          <button class="btn btn-secondary reading-timer-header _flex _ai-c _gap-6" title="Час читання цієї глави" tabindex="-1">
+            <Timer :size="16" />{{ formattedTime }}
+          </button>
+        </div>
         <div class="read-nav _flex _ai-c _gap-16">
           <button
             class="btn btn-secondary _flex _ai-c _gap-6"
@@ -36,6 +41,7 @@
       </div>
 
       <!-- Chapter Content -->
+
       <div class="read-body panel">
         <h1 class="chapter-title _h2">{{ chapter.title }}</h1>
         <div
@@ -56,7 +62,7 @@
         </div>
 
         <!-- Comment Input Panel -->
-        <div v-if="showCommentPanel" class="comment-input-panel">
+        <div v-if="showCommentPanel" class="comment-input-panel" :style="commentPanelPosition">
           <div class="comment-panel-header _flex _ai-c _jc-sb">
             <h3>Додати коментар</h3>
             <button type="button" @click="closeCommentPanel" class="close-btn">×</button>
@@ -147,19 +153,23 @@
     </div>
   </div>
 
-  <div v-else class="empty-state">
+  <button v-if="showFloatingTimer" class="reading-timer-float btn btn-secondary _flex _ai-c _gap-6" tabindex="-1">
+    <Timer :size="16" />{{ formattedTime }}
+  </button>
+
+  <div v-if="!chapter" class="empty-state">
     <p>Завантаження...</p>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useUserStore } from "../stores/user";
 import { useToast } from "../composables/useToast";
 import { RouteName } from "../router/keys";
 import { api } from '../utils/api';
-import { ArrowLeft, Bookmark, BookmarkCheck, ChevronLeft, ChevronRight, MessageSquare } from "lucide-vue-next";
+import { ArrowLeft, Bookmark, BookmarkCheck, ChevronLeft, ChevronRight, MessageSquare, Timer } from "lucide-vue-next";
 
 interface Reply {
   id?: string;
@@ -207,12 +217,61 @@ const showCommentTooltip = ref(false);
 const showCommentPanel = ref(false);
 const newCommentText = ref("");
 const tooltipPosition = ref({ top: "0px", left: "0px" });
+const commentPanelPosition = ref({ top: "0px", left: "0px" });
+const selectionRect = ref<DOMRect | null>(null);
 const expandedReplyIndex = ref(-1);
 const replyText = ref("");
 const generalCommentText = ref("");
 const chapterTextRef = ref<HTMLElement | null>(null);
 
+let readingStartTime: number | null = null;
+let hiddenSince: number | null = null;
+let trackedStoryId: number | null = null;
+let trackedChapterIndex: number | null = null;
+
+const elapsedSeconds = ref(0);
+let timerInterval: ReturnType<typeof setInterval> | null = null;
+
+const startTimer = () => {
+  elapsedSeconds.value = 0;
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => { elapsedSeconds.value++; }, 1000);
+};
+
+const resumeTimer = () => {
+  if (timerInterval) return;
+  timerInterval = setInterval(() => { elapsedSeconds.value++; }, 1000);
+};
+
+const stopTimer = () => {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+};
+
+const formattedTime = computed(() => {
+  const m = Math.floor(elapsedSeconds.value / 60);
+  const s = elapsedSeconds.value % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+});
+
+const flushReadingSession = (useBeacon = false) => {
+  if (readingStartTime == null || trackedStoryId == null || trackedChapterIndex == null) return;
+  const durationSeconds = Math.floor((Date.now() - readingStartTime) / 1000);
+  stopTimer();
+  readingStartTime = null;
+  if (durationSeconds < 5) return;
+  const payload = { storyId: trackedStoryId, chapterIndex: trackedChapterIndex, durationSeconds };
+  if (useBeacon && navigator.sendBeacon) {
+    navigator.sendBeacon(
+      (import.meta.env.VITE_API_URL ?? '') + `/statistics/reading-session`,
+      new Blob([JSON.stringify(payload)], { type: 'application/json' }),
+    );
+  } else {
+    void api.post('/statistics/reading-session', payload);
+  }
+};
+
 const loadChapter = async () => {
+  flushReadingSession();
   chapter.value = null;
   try {
     const data = await api.get(`/stories/${storyId.value}`);
@@ -220,6 +279,10 @@ const loadChapter = async () => {
     chapter.value = data.chapters?.[chapterIndex.value] ?? null;
     expandedReplyIndex.value = -1;
     isMine.value = !!data.isMine;
+    trackedStoryId = storyId.value;
+    trackedChapterIndex = chapterIndex.value;
+    readingStartTime = Date.now();
+    startTimer();
     if (userStore.isAuthorized && !data.isMine) {
       try {
         const status = await api.get(`/library/check/${storyId.value}`);
@@ -245,7 +308,39 @@ const toggleBookmark = async () => {
   }
 };
 
-onMounted(loadChapter);
+const showFloatingTimer = ref(false);
+const onScroll = () => { showFloatingTimer.value = window.scrollY > 120; };
+
+const onVisibilityChange = () => {
+  if (document.hidden) {
+    hiddenSince = Date.now();
+    stopTimer();
+  } else {
+    if (hiddenSince !== null && readingStartTime !== null) {
+      readingStartTime += Date.now() - hiddenSince;
+    }
+    hiddenSince = null;
+    if (readingStartTime !== null) resumeTimer();
+  }
+};
+
+const onBeforeUnload = () => flushReadingSession(true);
+
+onMounted(() => {
+  loadChapter();
+  window.addEventListener('beforeunload', onBeforeUnload);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  document.addEventListener('visibilitychange', onVisibilityChange);
+});
+
+onUnmounted(() => {
+  flushReadingSession();
+  stopTimer();
+  window.removeEventListener('beforeunload', onBeforeUnload);
+  window.removeEventListener('scroll', onScroll);
+  document.removeEventListener('visibilitychange', onVisibilityChange);
+});
+
 watch([() => route.params.id, () => route.params.chapterIndex], loadChapter);
 
 const navigateTo = (idx: number) => {
@@ -267,6 +362,7 @@ const handleTextSelection = () => {
     selectedText.value = selection.toString();
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
+    selectionRect.value = rect;
     const containerRect = chapterTextRef.value?.getBoundingClientRect();
     if (containerRect) {
       tooltipPosition.value = {
@@ -280,7 +376,21 @@ const handleTextSelection = () => {
   }
 };
 
+const COMMENT_PANEL_HEIGHT = 290;
+const COMMENT_PANEL_WIDTH = 320;
+
 const openCommentPanel = () => {
+  const rect = selectionRect.value;
+  if (rect) {
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const rawLeft = rect.left + rect.width / 2 - COMMENT_PANEL_WIDTH / 2;
+    const left = Math.min(window.innerWidth - COMMENT_PANEL_WIDTH - 8, Math.max(8, rawLeft));
+    const top = spaceBelow >= spaceAbove
+      ? rect.bottom + 10
+      : rect.top - COMMENT_PANEL_HEIGHT - 40;
+    commentPanelPosition.value = { top: `${top}px`, left: `${left}px` };
+  }
   showCommentPanel.value = true;
   showCommentTooltip.value = false;
 };
@@ -384,6 +494,25 @@ const formatDate = (date: string | Date | undefined) => {
   white-space: nowrap;
 }
 
+.reading-timer-header {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  cursor: default;
+}
+
+.reading-timer-float {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+  z-index: 200;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  cursor: default;
+  opacity: 1;
+  background: white;
+}
+
 .back-btn {
   font-size: 0.9rem;
 }
@@ -425,11 +554,14 @@ const formatDate = (date: string | Date | undefined) => {
 
 /* Comment Input Panel */
 .comment-input-panel {
-  background: #f8f9fa;
+  position: fixed;
+  background: white;
   border: 2px solid var(--color-primary);
   border-radius: 12px;
   padding: 20px;
-  margin-top: 24px;
+  width: 320px;
+  box-shadow: 0 8px 24px rgba(0, 123, 255, 0.15);
+  z-index: 1000;
 }
 .comment-panel-header { margin-bottom: 16px; }
 .comment-panel-header h3 { margin: 0; color: var(--color-text); }
@@ -497,5 +629,39 @@ const formatDate = (date: string | Date | undefined) => {
 
 .btn-bookmarked:hover {
   background-color: #fef08a;
+}
+
+@media (max-width: 768px) {
+  .read-header {
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .read-nav {
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    width: 100%;
+  }
+  .read-body {
+    padding: 24px 20px;
+  }
+  .general-comment-form {
+    padding: 20px;
+  }
+  .comments-section {
+    padding: 20px;
+  }
+  .read-footer {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .read-footer .btn {
+    flex: 1;
+    justify-content: center;
+  }
+  .reading-timer-float {
+    bottom: 16px;
+    right: 16px;
+  }
 }
 </style>

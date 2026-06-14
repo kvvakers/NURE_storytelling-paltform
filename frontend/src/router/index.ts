@@ -68,6 +68,12 @@ const routes = [
     component: () => import("../views/Notifications.vue"),
     meta: { requiresAuth: true },
   },
+  {
+    path: "/story/:id/statistics",
+    name: RouteName.STORY_STATISTICS,
+    component: () => import("../views/Statistics.vue"),
+    meta: { requiresAuth: true },
+  },
 ];
 
 const router = createRouter({

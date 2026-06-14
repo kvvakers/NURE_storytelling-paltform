@@ -75,6 +75,7 @@
           </div>
           <div v-if="story.isMine || story.isCoAuthor" class="story-owner-actions _flex _gap-12">
             <button class="btn btn-secondary _flex _ai-c _gap-6" @click="goToEditStory"><Pencil :size="15" />Редагувати</button>
+            <button v-if="story.isMine" class="btn btn-secondary _flex _ai-c _gap-6" @click="router.push({ name: RouteName.STORY_STATISTICS, params: { id: story.id } })"><BarChart2 :size="15" />Статистика</button>
             <button v-if="story.isMine" class="btn btn-danger _flex _ai-c _gap-6" @click="deleteStoryModal = true"><Trash2 :size="15" />Видалити</button>
           </div>
           <div v-else-if="userStore.isAuthorized" class="story-owner-actions _flex _gap-12">
@@ -339,7 +340,7 @@ import { RouteName } from "../router/keys";
 import { api } from '../utils/api';
 import { resolveMedia } from '../utils/resolveMedia';
 import placeholderImg from '../assets/placeholder.jpg';
-import { Pencil, Trash2, Plus, BookmarkPlus, BookmarkCheck, Heart, EyeOff, Eye } from "lucide-vue-next";
+import { Pencil, Trash2, Plus, BookmarkPlus, BookmarkCheck, Heart, EyeOff, Eye, BarChart2 } from "lucide-vue-next";
 
 interface Chapter {
   title: string;
@@ -1214,9 +1215,14 @@ const stripHtml = (html: string) => {
 
 @media (max-width: 768px) {
   .story-metadata { flex-direction: column; padding: 20px; }
-  .cover { width: 100%; height: auto; }
+  .cover { width: 100%; max-width: 280px; height: auto; margin: 0 auto; display: block; }
   .chapters-section { padding: 20px; }
-  .chapter-card-actions { width: 100%; }
+  .chapter-card { padding: 14px 16px; }
+  .chapter-card-actions { width: 100%; flex-wrap: wrap; }
   .comments-section { padding: 20px; }
+  .story-owner-actions { flex-wrap: wrap; }
+  .rating-stars-row { flex-wrap: wrap; }
+  .stars-input { flex-wrap: wrap; }
+  .star-btn { font-size: 1.3rem; }
 }
 </style>

@@ -171,4 +171,10 @@ watch(() => route.query, loadStories, { deep: true });
 .filter-badge-remove:hover {
   opacity: 1;
 }
+
+@media (max-width: 768px) {
+  .search-header {
+    margin-bottom: 16px;
+  }
+}
 </style>

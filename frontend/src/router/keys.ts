@@ -11,4 +11,5 @@ export const RouteName = Object.freeze({
   LOGIN: "login",
   REGISTER: "register",
   NOTIFICATIONS: "notifications",
+  STORY_STATISTICS: "story-statistics",
 });

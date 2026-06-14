@@ -791,4 +791,37 @@ const goBack = () => {
   .docs-title-input { width: 180px; }
   .docs-sidebar { width: 240px; }
 }
+@media (max-width: 768px) {
+  .docs-topbar {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 10px 0;
+  }
+  .docs-topbar-right {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-bottom: 6px;
+  }
+  .docs-title-input {
+    width: 140px;
+    font-size: 15px;
+  }
+  .docs-toolbar {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding: 4px 6px;
+  }
+  .word-count-badge {
+    font-size: 11px;
+  }
+  .docs-page { padding: 24px 16px 64px; }
+  .docs-sidebar { display: none; }
+  .docs-bottombar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+  .docs-chapter-mini { max-width: 140px; }
+  .collab-status { display: none; }
+}
 </style>

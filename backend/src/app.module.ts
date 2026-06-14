@@ -13,6 +13,7 @@ import { SeriesModule } from './modules/series/series.module';
 import { LibraryModule } from './modules/library/library.module';
 import { CoAuthorsModule } from './modules/co-authors/co-authors.module';
 import { CollaborationModule } from './modules/collaboration/collaboration.module';
+import { StatisticsModule } from './modules/statistics/statistics.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { CollaborationModule } from './modules/collaboration/collaboration.modul
     LibraryModule,
     CoAuthorsModule,
     CollaborationModule,
+    StatisticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

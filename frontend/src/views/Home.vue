@@ -19,11 +19,14 @@
         <div v-if="!isLoading && newStories.length === 0 && !errorMessage" class="loading-state">Поки немає доступних історій.</div>
         <swiper
           v-if="newStories.length > 0"
-          :slides-per-view="7"
-          :space-between="20"
+          :slides-per-view="1"
+          :space-between="16"
+          :breakpoints="swiperBreakpoints"
           :loop="newStories.length >= 7"
-          navigation
+          :navigation="!isMobile"
+          :pagination="isMobile ? { clickable: true } : false"
           class="stories-swiper swiper-fade"
+          :class="{ 'swiper-with-pagination': isMobile }"
         >
           <swiper-slide v-for="story in newStories" :key="story.id">
             <div class="story-card panel _flex _flex-col">
@@ -46,11 +49,14 @@
         <div v-if="!isLoading && popularStories.length === 0 && !errorMessage" class="loading-state">Немає популярних за останні 2 тижні.</div>
         <swiper
           v-if="popularStories.length > 0"
-          :slides-per-view="7"
-          :space-between="20"
+          :slides-per-view="1"
+          :space-between="16"
+          :breakpoints="swiperBreakpoints"
           :loop="popularStories.length >= 7"
-          navigation
+          :navigation="!isMobile"
+          :pagination="isMobile ? { clickable: true } : false"
           class="stories-swiper swiper-fade"
+          :class="{ 'swiper-with-pagination': isMobile }"
         >
           <swiper-slide v-for="story in popularStories" :key="story.id">
             <div class="story-card panel _flex _flex-col">
@@ -75,7 +81,7 @@
               class="genre-more-link"
             >Всі →</RouterLink>
           </div>
-          <div class="genre-grid">
+          <div class="stories-grid">
             <Card v-for="story in section.stories" :key="story.id" :story="story" />
           </div>
         </section>
@@ -85,19 +91,20 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 
 import { Swiper, SwiperSlide } from "swiper/vue";
 import "swiper/css";
 import "swiper/css/navigation";
-import { Navigation } from "swiper/modules";
+import "swiper/css/pagination";
+import { Navigation, Pagination } from "swiper/modules";
 import SwiperCore from "swiper";
 import { RouteName } from "../router/keys";
 import { api } from '../utils/api';
 import { resolveMedia } from '../utils/resolveMedia';
 import placeholderImg from '../assets/placeholder.jpg';
 import Card from '../components/Card.vue';
-SwiperCore.use([Navigation]);
+SwiperCore.use([Navigation, Pagination]);
 
 interface Story {
   id: number;
@@ -116,6 +123,18 @@ interface GenreSection {
   genre: string;
   stories: Story[];
 }
+
+const isMobile = ref(window.innerWidth <= 400);
+const onResize = () => { isMobile.value = window.innerWidth <= 400; };
+onMounted(() => window.addEventListener('resize', onResize));
+onUnmounted(() => window.removeEventListener('resize', onResize));
+
+const swiperBreakpoints = {
+  401:  { slidesPerView: 3, spaceBetween: 16 },
+  768:  { slidesPerView: 4, spaceBetween: 20 },
+  1024: { slidesPerView: 5, spaceBetween: 20 },
+  1280: { slidesPerView: 7, spaceBetween: 20 },
+};
 
 const newStories = ref<Story[]>([]);
 const popularStories = ref<Story[]>([]);
@@ -221,16 +240,34 @@ onMounted(async () => {
   text-decoration: underline;
 }
 
-.genre-grid {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 16px;
+.swiper-with-pagination {
+  padding-bottom: 36px !important;
 }
 
-@media (max-width: 1400px) {
-  .genre-grid { grid-template-columns: repeat(4, 1fr); }
-}
-@media (max-width: 900px) {
-  .genre-grid { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 768px) {
+  .swiper-fade::before,
+  .swiper-fade::after {
+    display: none;
+  }
+  .hero {
+    padding: 20px 0;
+  }
+  .hero p {
+    font-size: 15px;
+  }
+  .hero-buttons {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .hero-buttons button {
+    margin: 0;
+    width: 100%;
+    max-width: 280px;
+  }
+.section {
+    margin-bottom: 28px;
+  }
 }
 </style>

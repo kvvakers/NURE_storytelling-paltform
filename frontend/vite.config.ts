@@ -18,6 +18,6 @@ export default defineConfig({
     conditions: ['import', 'module', 'browser', 'default'],
   },
   optimizeDeps: {
-    include: ['socket.io-client'],
+    include: ['socket.io-client', 'apexcharts', 'vue3-apexcharts'],
   },
 })

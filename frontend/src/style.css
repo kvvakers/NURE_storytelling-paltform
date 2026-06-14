@@ -120,6 +120,9 @@ a {
   padding: 0 20px;
   margin: 0 auto;
 }
+._container--md {
+  max-width: 1200px;
+}
 
 /* ============================================================
    Swiper overrides
@@ -471,4 +474,14 @@ a {
 }
 .avatar-file-input {
   display: none;
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 768px) {
+  ._page { padding: 20px 0; }
+  ._h1 { font-size: 1.8rem; }
+  ._h2 { font-size: 1.4rem; }
+  ._container { padding: 0 16px; }
 }

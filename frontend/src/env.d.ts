@@ -1,5 +1,11 @@
 /// <reference types="vite/client" />
 
+declare module '@vue/runtime-core' {
+  interface GlobalComponents {
+    apexchart: typeof import('vue3-apexcharts')['default']
+  }
+}
+
 declare module '*.vue' {
   import { DefineComponent } from 'vue'
   const component: DefineComponent<{}, {}, any>

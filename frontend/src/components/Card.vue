@@ -68,7 +68,7 @@ defineProps({
 .cover {
   width: 100%;
   height: 250px;
-  object-fit: contain;
+  object-fit: cover;
 }
 .info {
   padding: 16px;
@@ -91,5 +91,12 @@ defineProps({
   padding: 4px 10px;
   border-radius: 8px;
   font-size: 12px;
+}
+
+@media (max-width: 768px) {
+  .cover {
+    height: 160px;
+    object-fit: cover;
+  }
 }
 </style>

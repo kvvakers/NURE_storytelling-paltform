@@ -1,34 +1,32 @@
 <template>
   <header class="header">
     <div class="header-container _container _flex _ai-c _jc-sb">
-      <div class="_flex _flex-full _gap-x-32">
-        <RouterLink to="/"  class="logo _flex _ai-c _gap-8 _shrink-0">
-          <img src="../assets/logo.svg" alt="Logo" class="logo-img" />
-          <span class="logo-text">Storytelling</span>
-        </RouterLink>
+      <RouterLink to="/" class="logo _flex _ai-c _gap-8 _shrink-0">
+        <img src="../assets/logo.svg" alt="Logo" class="logo-img" />
+        <span class="logo-text">Storytelling</span>
+      </RouterLink>
 
-        <div class="search-bar _flex _ai-c _flex-full _gap-8">
-          <Search :size="18" class="search-icon" />
-          <input
-            v-model="searchQuery"
-            @keyup.enter="search"
-            type="text"
-            placeholder="Пошук історій..."
-            class="search-input _flex-1"
-          />
-          <button class="filter-btn" :class="{ active: showFilterSidebar }" @click="showFilterSidebar = !showFilterSidebar" title="Фільтри">
-            <SlidersHorizontal :size="18" />
-          </button>
-        </div>
-        <FilterSidebar v-model="showFilterSidebar" :search-query="searchQuery" />
+      <div class="search-bar _flex _ai-c _flex-full _gap-8">
+        <Search :size="18" class="search-icon" />
+        <input
+          v-model="searchQuery"
+          @keyup.enter="search"
+          type="text"
+          placeholder="Пошук історій..."
+          class="search-input _flex-1"
+        />
+        <button class="filter-btn" :class="{ active: showFilterSidebar }" @click="showFilterSidebar = !showFilterSidebar" title="Фільтри">
+          <SlidersHorizontal :size="18" />
+        </button>
       </div>
+      <FilterSidebar v-model="showFilterSidebar" :search-query="searchQuery" />
 
       <div v-if="userStore.isAuthorized" class="actions _flex _gap-8 _shrink-0">
         <button class="btn btn-secondary _flex _ai-c _gap-6" @click="handleWrite">
-          <PenLine :size="16" />Написати
+          <PenLine :size="16" /><span class="btn-label">Написати</span>
         </button>
         <button class="btn btn-secondary _flex _ai-c _gap-6" @click="showLogoutModal = true">
-          <LogOut :size="16" />Вихід
+          <LogOut :size="16" /><span class="btn-label">Вихід</span>
         </button>
         <RouterLink :to="{ name: RouteName.NOTIFICATIONS }" class="notif-btn btn btn-secondary _flex _ai-c _jc-c" title="Сповіщення">
           <Bell :size="18" />
@@ -44,13 +42,13 @@
 
       <div v-else class="actions _flex _gap-8 _shrink-0">
         <button class="btn btn-primary _flex _ai-c _gap-6" @click="handleWrite">
-          <PenLine :size="16" />Написати
+          <PenLine :size="16" /><span class="btn-label">Написати</span>
         </button>
         <button class="btn btn-secondary _flex _ai-c _gap-6" @click="handleLogin">
-          <LogIn :size="16" />Вхід
+          <LogIn :size="16" /><span class="btn-label">Вхід</span>
         </button>
         <button class="btn btn-signup _flex _ai-c _gap-6" @click="handleSignUp">
-          <UserPlus :size="16" />Реєстрація
+          <UserPlus :size="16" /><span class="btn-label">Реєстрація</span>
         </button>
       </div>
     </div>
@@ -157,6 +155,35 @@ const confirmLogout = () => {
 }
 .header-container {
   gap: 2rem;
+}
+
+@media (max-width: 768px) {
+  .header-container {
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+  .logo {
+    order: 1;
+    flex-shrink: 0;
+  }
+  .actions {
+    order: 2;
+    margin-left: auto;
+  }
+  .search-bar {
+    order: 3;
+    flex: 1 1 100%;
+    max-width: none;
+  }
+  .btn-label {
+    display: none;
+  }
+  .profile-name {
+    display: none;
+  }
+  .logo-text {
+    display: none;
+  }
 }
 .logo-img {
   height: 40px;

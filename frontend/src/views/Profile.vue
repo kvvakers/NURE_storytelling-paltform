@@ -1,5 +1,6 @@
 <template>
-  <div class="profile-page">
+  <div class="_page">
+    <div class="_container _container--md">
     <div v-if="isLoading" class="loading-state">Завантаження профілю...</div>
     <div v-else-if="errorMessage" class="error-state">{{ errorMessage }}</div>
     <template v-else>
@@ -253,6 +254,7 @@
           <button class="btn btn-secondary" @click="showFollowingModal = false">Закрити</button>
         </div>
       </div>
+    </div>
     </div>
   </div>
 </template>
@@ -514,12 +516,6 @@ async function saveProfile() {
 </script>
 
 <style scoped>
-.profile-page {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 40px 20px;
-}
-
 .profile-header {
   margin-bottom: 40px;
 }
@@ -681,6 +677,10 @@ async function saveProfile() {
   text-decoration: underline;
 }
 
+.library-content {
+  width: 100%;
+}
+
 /* Stories grid (shared) */
 .series-group {
   margin-bottom: 40px;
@@ -795,5 +795,36 @@ async function saveProfile() {
 
 .continue-reading-btn:hover {
   background: #dbeafe;
+}
+
+@media (max-width: 768px) {
+  .profile-main {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 20px;
+  }
+  .profile-avatar {
+    width: 120px;
+    height: 120px;
+  }
+  .profile-title {
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .stats {
+    justify-content: center;
+  }
+  .library-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .nickname {
+    font-size: 22px;
+  }
+  .btn span {
+    width: auto;
+  }
 }
 </style>

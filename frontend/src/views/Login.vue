@@ -48,3 +48,11 @@ const submitLogin = async () => {
 };
 </script>
 
+<style scoped>
+@media (max-width: 768px) {
+  .auth-card {
+    padding: 24px 20px;
+  }
+}
+</style>
+

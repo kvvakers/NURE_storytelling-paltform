@@ -212,4 +212,20 @@ const formatDate = (date: string) => {
   padding: 5px 12px;
   font-size: 0.85rem;
 }
+
+@media (max-width: 768px) {
+  .notifications-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .notifications-header h1 {
+    font-size: 1.5rem;
+  }
+  .notification-item {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+}
 </style>
