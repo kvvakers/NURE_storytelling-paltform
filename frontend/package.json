@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tiptap/extension-collaboration": "^3.27.0",
     "@tiptap/extension-color": "^3.22.3",
     "@tiptap/extension-font-family": "^3.22.3",
     "@tiptap/extension-highlight": "^3.22.3",
@@ -26,7 +27,9 @@
     "swiper": "^12.1.1",
     "vue": "^3.5.22",
     "vue-router": "^5.0.2",
-    "vue3-apexcharts": "^1.11.1"
+    "vue3-apexcharts": "^1.11.1",
+    "y-websocket": "^3.0.0",
+    "yjs": "^13.6.31"
   },
   "devDependencies": {
     "@types/node": "^24.6.0",

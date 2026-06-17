@@ -13,15 +13,15 @@
         <div v-if="isCollaborating" class="collab-zone _flex _ai-c _gap-8">
           <div class="collab-avatars _flex _ai-c">
             <div
-              v-for="[uid, u] in activeUsers"
-              :key="uid"
+              v-for="u in activeUsers"
+              :key="u.clientId"
               class="collab-avatar"
               :style="{ background: u.color }"
               :title="u.userName"
-            >{{ u.userName[0]?.toUpperCase() }}</div>
+            >{{ u.userName?.[0]?.toUpperCase() }}</div>
           </div>
-          <span class="collab-status" :class="socketConnected ? 'connected' : 'connecting'">
-            {{ socketConnected ? (activeUsers.size > 0 ? 'Спільне редагування' : 'Очікування...') : 'З\'єднання...' }}
+          <span class="collab-status" :class="providerConnected ? 'connected' : 'connecting'">
+            {{ providerConnected ? (activeUsers.length > 0 ? 'Спільне редагування' : 'Очікування...') : 'З\'єднання...' }}
           </span>
         </div>
         <div class="word-count-badge">Слів: {{ wordCount }} | Символів: {{ charCount }}</div>
@@ -183,7 +183,9 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import StarterKit from "@tiptap/starter-kit";
 import TextAlign from "@tiptap/extension-text-align";
 import Underline from "@tiptap/extension-underline";
-import { io, type Socket } from "socket.io-client";
+import Collaboration from "@tiptap/extension-collaboration";
+import * as Y from "yjs";
+import { WebsocketProvider } from "y-websocket";
 import { RouteName } from "../router/keys";
 import { useUserStore } from "../stores/user";
 import { useToast } from "../composables/useToast";
@@ -260,14 +262,13 @@ const existingStoryTitle = ref("");
 
 // ─── Collaboration state ──────────────────────────────────────────────────────
 const isCollaborating = computed(() => isEditChapterMode.value && !!existingStoryId.value && existingChapterIndex.value !== null);
-const socketConnected = ref(false);
-const activeUsers = ref(new Map<number, { userName: string; color: string }>());
+const providerConnected = ref(false);
+const activeUsers = ref<Array<{ clientId: number; userId: number; userName: string; color: string }>>([]);
 
-let socket: Socket | null = null;
-let lastLocalEdit = 0;
-let contentDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+const ydoc = new Y.Doc();
+let provider: WebsocketProvider | null = null;
+let initialChapterContent = '';
 let autoSaveTimer: ReturnType<typeof setInterval> | null = null;
-let isApplyingRemoteContent = false;
 
 // ─── Story / chapter data ─────────────────────────────────────────────────────
 interface Comment { id: string; selectedText: string; text: string }
@@ -293,38 +294,17 @@ const editor = useEditor({
     StarterKit,
     TextAlign.configure({ types: ["heading", "paragraph"] }),
     Underline,
+    Collaboration.configure({ document: ydoc }),
     RemoteCursorsExtension,
   ],
-  content: "<p></p>",
   onUpdate({ editor }) {
     chapterData.value.content = editor.getHTML();
-    lastLocalEdit = Date.now();
-    if (!isApplyingRemoteContent && isCollaborating.value && socket?.connected) {
-      if (contentDebounceTimer) clearTimeout(contentDebounceTimer);
-      contentDebounceTimer = setTimeout(() => {
-        socket?.emit('content-update', {
-          storyId: existingStoryId.value,
-          chapterIndex: existingChapterIndex.value,
-          content: editor.getHTML(),
-          userId: userStore.user?.id,
-          timestamp: Date.now(),
-        });
-      }, 500);
-    }
   },
   onSelectionUpdate({ editor }) {
     const { from, to } = editor.state.selection;
     hasSelection.value = from !== to;
-    if (isCollaborating.value && socket?.connected && userStore.user?.id) {
-      socket.emit('cursor-update', {
-        storyId: existingStoryId.value,
-        chapterIndex: existingChapterIndex.value,
-        userId: userStore.user.id,
-        from,
-        to,
-        color: getUserColor(userStore.user.id),
-        userName: userStore.user.username || userStore.user.email || 'Автор',
-      });
+    if (isCollaborating.value && provider) {
+      provider.awareness.setLocalStateField('cursor', { from, to });
     }
   },
 });
@@ -345,67 +325,64 @@ function flushCursorDecorations() {
   } catch { /* editor may be destroyed */ }
 }
 
-// ─── Socket lifecycle ─────────────────────────────────────────────────────────
-function initSocket() {
+// ─── Yjs collaboration lifecycle ──────────────────────────────────────────────
+function initCollaboration() {
   const userId = userStore.user?.id;
   if (!userId || !existingStoryId.value || existingChapterIndex.value === null) return;
 
   const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
-  const socketOrigin = apiUrl.startsWith('http') ? new URL(apiUrl).origin : window.location.origin;
-  const color   = getUserColor(userId);
+  const origin = apiUrl.startsWith('http') ? new URL(apiUrl).origin : window.location.origin;
+  const wsOrigin = origin.replace(/^http/, 'ws');
+  const roomName = `story-${existingStoryId.value}-chapter-${existingChapterIndex.value}`;
+  const color = getUserColor(userId);
   const userName = userStore.user?.username || userStore.user?.email || 'Автор';
 
-  socket = io(`${socketOrigin}/collaboration`, { transports: ['websocket', 'polling'] });
+  provider = new WebsocketProvider(`${wsOrigin}/yjs`, roomName, ydoc);
 
-  socket.on('connect', () => {
-    socketConnected.value = true;
-    socket!.emit('join', { storyId: existingStoryId.value, chapterIndex: existingChapterIndex.value, userId, userName, color });
+  provider.on('status', ({ status }: { status: string }) => {
+    providerConnected.value = status === 'connected';
   });
 
-  socket.on('disconnect', () => { socketConnected.value = false; });
+  provider.awareness.setLocalStateField('user', { userId, userName, color });
 
-  socket.on('active-users', (users: Array<{ userId: number; userName: string; color: string }>) => {
-    const m = new Map<number, { userName: string; color: string }>();
-    users.forEach(u => m.set(u.userId, { userName: u.userName, color: u.color }));
-    activeUsers.value = m;
+  // On first sync: if the Yjs doc is empty (no other user is editing), load saved content
+  provider.once('sync', (isSynced: boolean) => {
+    if (isSynced && ydoc.getXmlFragment('default').length === 0 && initialChapterContent) {
+      editor.value?.commands.setContent(initialChapterContent || '<p></p>');
+    }
   });
 
-  socket.on('user-joined', (data: { userId: number; userName: string; color: string }) => {
-    activeUsers.value = new Map(activeUsers.value).set(data.userId, { userName: data.userName, color: data.color });
-    showToast(`${data.userName} приєднався до редагування`, 'info');
-  });
+  // Presence + remote cursors via awareness
+  provider.awareness.on('change', () => {
+    if (!provider) return;
+    const states = Array.from(provider.awareness.getStates().entries()) as Array<[number, Record<string, unknown>]>;
+    const localId = provider.awareness.clientID;
 
-  socket.on('user-left', (data: { userId: number }) => {
-    const updated = new Map(activeUsers.value);
-    const u = updated.get(data.userId);
-    if (u) { showToast(`${u.userName} покинув редагування`, 'info'); updated.delete(data.userId); }
-    activeUsers.value = updated;
-    const newCursors = new Map(remoteCursors.value);
-    newCursors.delete(data.userId);
+    // Update active users (exclude self)
+    activeUsers.value = states
+      .filter(([id, s]) => id !== localId && s.user)
+      .map(([id, s]) => ({ clientId: id, ...(s.user as { userId: number; userName: string; color: string }) }));
+
+    // Update remote cursors (exclude self)
+    const newCursors = new Map<number, RemoteCursor>();
+    for (const [id, s] of states) {
+      if (id === localId || !s.user || !s.cursor) continue;
+      const { userId: uid, userName: uName, color: uColor } = s.user as { userId: number; userName: string; color: string };
+      const { from, to } = s.cursor as { from: number; to: number };
+      newCursors.set(uid, { userId: uid, from, to, color: uColor, userName: uName });
+    }
     remoteCursors.value = newCursors;
     flushCursorDecorations();
-  });
 
-  socket.on('content-updated', (data: { content: string; userId: number }) => {
-    if (data.userId === userStore.user?.id || !editor.value) return;
-    // Don't overwrite while the local user is actively typing
-    if (Date.now() - lastLocalEdit < 2000) return;
-    const current = editor.value.getHTML();
-    if (current === data.content) return;
-    const { from, to } = editor.value.state.selection;
-    isApplyingRemoteContent = true;
-    editor.value.commands.setContent(data.content);
-    isApplyingRemoteContent = false;
-    try {
-      const size = editor.value.state.doc.content.size;
-      editor.value.commands.setTextSelection({ from: Math.min(from, size - 1), to: Math.min(to, size - 1) });
-    } catch { /* position may be out of range */ }
-  });
-
-  socket.on('cursor-updated', (data: { userId: number; from: number; to: number; color: string; userName: string }) => {
-    if (data.userId === userStore.user?.id) return;
-    remoteCursors.value = new Map(remoteCursors.value).set(data.userId, data);
-    flushCursorDecorations();
+    // Toast on join/leave
+    const prevIds = new Set(activeUsers.value.map(u => u.clientId));
+    for (const [id, s] of states) {
+      if (id === localId || !s.user) continue;
+      if (!prevIds.has(id)) {
+        const { userName: uName } = s.user as { userName: string };
+        showToast(`${uName} приєднався до редагування`, 'info');
+      }
+    }
   });
 }
 
@@ -425,22 +402,26 @@ onMounted(async () => {
           // If the published chapter has a pending draft, edit that instead
           chapterData.value.title   = ch.draftTitle   != null ? ch.draftTitle   : ch.title;
           chapterData.value.content = ch.draftContent != null ? ch.draftContent : ch.content;
-          const editContent = ch.draftContent != null ? ch.draftContent : ch.content;
-          editor.value?.commands.setContent(editContent || "<p></p>");
+          initialChapterContent = ch.draftContent != null ? ch.draftContent : ch.content;
+          // In non-collaborative mode set content immediately; in collaborative mode
+          // wait for Yjs sync to decide whether to initialize from saved content
+          if (!isCollaborating.value) {
+            editor.value?.commands.setContent(initialChapterContent || "<p></p>");
+          }
         }
       }
     } catch (e) {
       console.error(e);
     }
   }
-  if (isCollaborating.value) initSocket();
+  if (isCollaborating.value) initCollaboration();
   autoSaveTimer = setInterval(autoSaveDraft, 60_000);
 });
 
 onBeforeUnmount(() => {
   editor.value?.destroy();
-  socket?.disconnect();
-  if (contentDebounceTimer) clearTimeout(contentDebounceTimer);
+  provider?.destroy();
+  ydoc.destroy();
   if (autoSaveTimer) clearInterval(autoSaveTimer);
 });
 
